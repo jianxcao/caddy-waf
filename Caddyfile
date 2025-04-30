@@ -4,7 +4,6 @@
 }
 
 :8080 {
-
 	log {
 		output stdout
 		format console
@@ -32,7 +31,7 @@
 				requests 100
 				window 10s
 				cleanup_interval 5m
-				paths /ratelimited 	# List of individual regex patterns (example: paths ^/api/.*)
+				paths /ratelimited # List of individual regex patterns (example: paths ^/api/.*)
 				match_all_paths false
 			}
 
@@ -56,7 +55,7 @@
 		# Match the waf metrics endpoint specifically and stop processing
 		@wafmetrics path /waf_metrics
 		handle @wafmetrics {
-			header Access-Control-Allow-Origin *  # Allow requests from any origin (for development - see note below)
+			header Access-Control-Allow-Origin * # Allow requests from any origin (for development - see note below)
 			header Access-Control-Allow-Methods "GET, OPTIONS" # Allow GET and OPTIONS methods
 			header Access-Control-Allow-Headers "User-Agent, Content-Type, *" # Allow User-Agent and Content-Type headers
 			# Do not respond here so it goes to the WAF plugin

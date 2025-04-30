@@ -30,12 +30,12 @@ var (
 )
 
 // Add or update the version constant as needed
-const wafVersion = "v0.0.1" // update this value to the new release version when tagging
+const wafVersion = "v0.0.5" // update this value to the new release version when tagging
 
 // ==================== Initialization and Setup ====================
 
 func init() {
-	caddy.RegisterModule(&Middleware{}) // Changed from Middleware{} to &Middleware{}
+	caddy.RegisterModule(&Middleware{}) // Uncommented this line to properly register the module
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
 }
 
