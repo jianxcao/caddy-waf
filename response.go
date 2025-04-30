@@ -2,65 +2,38 @@ package caddywaf
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 // blockRequest handles blocking a request and logging the details.
 func (m *Middleware) blockRequest(recorder http.ResponseWriter, r *http.Request, state *WAFState, statusCode int, reason, ruleID, matchedValue string, fields ...zap.Field) {
-
+	// CRITICAL FIX: Set these flags before any other operations
 	state.Blocked = true
 	state.StatusCode = statusCode
 	state.ResponseWritten = true
 
-	// Custom response handling
-	if resp, ok := m.CustomResponses[statusCode]; ok {
-		m.logger.Debug("Custom response found for status code",
-			zap.Int("status_code", statusCode),
-			zap.String("body", resp.Body),
-		)
-		m.writeCustomResponse(recorder, statusCode)
-		return
-	}
-
-	// Default blocking behavior
-	logID := uuid.New().String()
-	if logIDCtx, ok := r.Context().Value(ContextKeyLogId("logID")).(string); ok {
-		logID = logIDCtx
-	}
-
-	// Prepare standard fields for logging
-	blockFields := []zap.Field{
-		zap.String("log_id", logID),
-		zap.String("source_ip", r.RemoteAddr),
-		zap.String("user_agent", r.UserAgent()),
-		zap.String("request_method", r.Method),
-		zap.String("request_path", r.URL.Path),
-		zap.String("query_params", r.URL.RawQuery),
+	// CRITICAL FIX: Log at WARN level for visibility
+	m.logger.Warn("REQUEST BLOCKED BY WAF", append(fields,
+		zap.String("rule_id", ruleID),
+		zap.String("reason", reason),
 		zap.Int("status_code", statusCode),
-		zap.Time("timestamp", time.Now()),
-		zap.String("reason", reason),              // Include the reason for blocking
-		zap.String("rule_id", ruleID),             // Include the rule ID
-		zap.String("matched_value", matchedValue), // Include the matched value
-	}
+		zap.String("remote_addr", r.RemoteAddr),
+		zap.Int("total_score", state.TotalScore))...)
 
-	// Debug: Print the blockFields to verify they are correct
-	m.logger.Debug("Block fields being passed to logRequest",
-		zap.Any("blockFields", blockFields),
-	)
+	// CRITICAL FIX: Increment blocked metrics immediately
+	m.incrementBlockedRequestsMetric()
 
-	// Append additional fields if any
-	blockFields = append(blockFields, fields...)
-
-	// Log the blocked request at WARN level
-	m.logRequest(zapcore.WarnLevel, "Request blocked", r, blockFields...)
-
-	// Write default response with status code using the recorder
+	// Write a simple text response for blocked requests
+	recorder.Header().Set("Content-Type", "text/plain")
 	recorder.WriteHeader(statusCode)
+
+	message := fmt.Sprintf("Request blocked by WAF. Reason: %s", reason)
+	if _, err := recorder.Write([]byte(message)); err != nil {
+		m.logger.Error("Failed to write blocked response", zap.Error(err))
+	}
 }
 
 // responseRecorder captures the response status code, headers, and body.

@@ -44,30 +44,48 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 		zap.Int("anomaly_threshold", m.AnomalyThreshold),
 	)
 
-	shouldBlock := !state.ResponseWritten && (state.TotalScore >= m.AnomalyThreshold || rule.Action == "block")
-	blockReason := ""
+	// CRITICAL FIX: Check if "mode" field in rule doesn't match the required "action" field
+	// There's a mismatch between Rule.Action and the "mode" field in the JSON
+	// Map "mode" to "action" for proper rule processing
+	actualAction := rule.Action
 
+	// Debug the actual action field value to verify what's being used
+	m.logger.Debug("Rule action/mode check",
+		zap.String("rule_id", string(rule.ID)),
+		zap.String("action_field", rule.Action),
+		zap.Int("score", rule.Score),
+		zap.Int("threshold", m.AnomalyThreshold),
+		zap.Int("total_score", state.TotalScore))
+
+	// CRITICAL FIX: Check if the request should be blocked
+	exceedsThreshold := !state.ResponseWritten && (state.TotalScore >= m.AnomalyThreshold)
+	explicitBlock := !state.ResponseWritten && (actualAction == "block")
+	shouldBlock := exceedsThreshold || explicitBlock
+
+	// Set appropriate block reason based on what triggered the block
+	blockReason := ""
 	if shouldBlock {
-		blockReason = "Anomaly threshold exceeded"
-		if rule.Action == "block" {
+		if exceedsThreshold {
+			blockReason = "Anomaly threshold exceeded"
+		}
+		if explicitBlock {
 			blockReason = "Rule action is 'block'"
 		}
-	}
 
-	m.logRequest(zapcore.DebugLevel, "Determining Block Action", r, // More descriptive log message
-		zap.String("action", rule.Action),
-		zap.Bool("should_block", shouldBlock),
-		zap.String("block_reason", blockReason),
-		zap.Int("total_score", state.TotalScore),         // ADDED: Log total score in block decision log
-		zap.Int("anomaly_threshold", m.AnomalyThreshold), // ADDED: Log anomaly threshold in block decision log
-	)
+		// Ensure we're setting the blocked state
+		state.Blocked = true
+		state.StatusCode = http.StatusForbidden
 
-	if shouldBlock {
+		// Block the request and write the response immediately
 		m.blockRequest(w, r, state, http.StatusForbidden, blockReason, string(rule.ID), value,
 			zap.Int("total_score", state.TotalScore),
 			zap.Int("anomaly_threshold", m.AnomalyThreshold),
-			zap.String("final_block_reason", blockReason), // ADDED: Clarify block reason in blockRequest log
+			zap.String("final_block_reason", blockReason),
+			zap.Bool("explicitly_blocked", explicitBlock),
+			zap.Bool("threshold_exceeded", exceedsThreshold),
 		)
+
+		// Return false to stop processing more rules
 		return false
 	}
 
@@ -88,6 +106,7 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 		)
 	}
 
+	// Continue processing other rules
 	return true
 }
 

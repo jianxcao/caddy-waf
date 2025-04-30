@@ -78,7 +78,8 @@ func (rve *RequestValueExtractor) ExtractValue(target string, r *http.Request, w
 
 // extractSingleValue extracts a value based on a single target
 func (rve *RequestValueExtractor) extractSingleValue(target string, r *http.Request, w http.ResponseWriter) (string, error) {
-	target = strings.ToUpper(strings.TrimSpace(target))
+	origTarget := target
+	targetUpper := strings.ToUpper(strings.TrimSpace(target))
 	var unredactedValue string
 	var err error
 
@@ -121,7 +122,7 @@ func (rve *RequestValueExtractor) extractSingleValue(target string, r *http.Requ
 		},
 	}
 
-	if extractor, exists := extractionLogic[target]; exists {
+	if extractor, exists := extractionLogic[targetUpper]; exists {
 		unredactedValue, err = extractor()
 		if err != nil {
 			return "", err // Return error from extractor
@@ -146,13 +147,16 @@ func (rve *RequestValueExtractor) extractSingleValue(target string, r *http.Requ
 		if err != nil {
 			return "", err
 		}
-	} else if strings.HasPrefix(target, TargetURLParamPrefix) {
-		unredactedValue, err = rve.extractURLParam(r.URL, strings.TrimPrefix(target, TargetURLParamPrefix), target)
+	} else if strings.HasPrefix(targetUpper, TargetURLParamPrefix) {
+		// CRITICAL FIX: Use the original parameter name (without uppercase conversion)
+		paramName := strings.TrimPrefix(origTarget, TargetURLParamPrefix)
+		unredactedValue, err = rve.extractURLParam(r.URL, paramName, target)
 		if err != nil {
 			return "", err
 		}
-	} else if strings.HasPrefix(target, TargetJSONPathPrefix) {
-		unredactedValue, err = rve.extractValueForJSONPath(r, strings.TrimPrefix(target, TargetJSONPathPrefix), target)
+	} else if strings.HasPrefix(targetUpper, TargetJSONPathPrefix) {
+		jsonPath := strings.TrimPrefix(origTarget, TargetJSONPathPrefix)
+		unredactedValue, err = rve.extractValueForJSONPath(r, jsonPath, target)
 		if err != nil {
 			return "", err
 		}
@@ -303,9 +307,17 @@ func (rve *RequestValueExtractor) extractDynamicCookie(r *http.Request, cookieNa
 
 // Helper function to extract URL parameter value
 func (rve *RequestValueExtractor) extractURLParam(url *url.URL, paramName string, target string) (string, error) {
-	paramValue := url.Query().Get(paramName)
+	// Clean up the paramName by removing any potential remaining prefix
+	// This is critical for handling cases where the origTarget trimming didn't fully work
+	cleanParamName := strings.TrimPrefix(paramName, "url_param:")
+
+	paramValue := url.Query().Get(cleanParamName)
 	if paramValue == "" {
-		rve.logger.Debug("URL parameter not found", zap.String("parameter", paramName), zap.String("target", target))
+		rve.logger.Debug("URL parameter not found",
+			zap.String("parameter", paramName),
+			zap.String("clean_parameter", cleanParamName),
+			zap.String("target", target),
+			zap.String("available_params", url.RawQuery)) // Log available params for debugging
 		return "", fmt.Errorf("url parameter '%s' not found for target: %s", paramName, target)
 	}
 	return paramValue, nil
@@ -363,13 +375,12 @@ func (rve *RequestValueExtractor) extractAllCookies(cookies []*http.Cookie, logM
 	return strings.Join(cookieStrings, "; "), nil
 }
 
-// Helper function for JSON path extraction.
+// Helper function for JSON path extraction
 func (rve *RequestValueExtractor) extractJSONPath(jsonStr string, jsonPath string) (string, error) {
 	// Validate input JSON string
 	if jsonStr == "" {
 		return "", fmt.Errorf("json string is empty")
 	}
-
 	// Validate JSON path
 	if jsonPath == "" {
 		return "", fmt.Errorf("json path is empty")
@@ -380,7 +391,6 @@ func (rve *RequestValueExtractor) extractJSONPath(jsonStr string, jsonPath strin
 	if err := json.Unmarshal([]byte(jsonStr), &jsonData); err != nil {
 		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
-
 	// Check if JSON data is valid
 	if jsonData == nil {
 		return "", fmt.Errorf("invalid json data")

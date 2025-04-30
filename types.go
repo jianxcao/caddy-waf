@@ -120,7 +120,7 @@ type Rule struct {
 	Targets     []string `json:"targets"`
 	Severity    string   `json:"severity"` // Used for logging only
 	Score       int      `json:"score"`
-	Action      string   `json:"mode"` // Determines the action (block/log)
+	Action      string   `json:"mode"` // CRITICAL FIX: This should map to the "mode" field in JSON
 	Description string   `json:"description"`
 	regex       *regexp.Regexp
 	Priority    int // New field for rule priority

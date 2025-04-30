@@ -123,6 +123,14 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 		zap.Int("anomaly_threshold", m.AnomalyThreshold),
 	)
 
+	// ADDED: Set default anomaly threshold if not provided or invalid
+	if m.AnomalyThreshold <= 0 {
+		m.AnomalyThreshold = 20 // Use a reasonable default value
+		m.logger.Info("Using default anomaly threshold", zap.Int("anomaly_threshold", m.AnomalyThreshold))
+	} else {
+		m.logger.Info("Using configured anomaly threshold", zap.Int("anomaly_threshold", m.AnomalyThreshold))
+	}
+
 	// Start the asynchronous logging worker
 	m.StartLogWorker()
 

@@ -78,11 +78,27 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 // isPhaseBlocked encapsulates the phase handling and blocking check logic.
 func (m *Middleware) isPhaseBlocked(w http.ResponseWriter, r *http.Request, phase int, state *WAFState) bool {
 	m.handlePhase(w, r, phase, state)
+
 	if state.Blocked {
 		m.incrementBlockedRequestsMetric()
-		w.WriteHeader(state.StatusCode)
+
+		// IMPORTANT: Log the block event with details
+		m.logger.Warn("Request blocked in phase evaluation",
+			zap.Int("phase", phase),
+			zap.Int("status_code", state.StatusCode),
+			zap.Int("total_score", state.TotalScore),
+			zap.Int("anomaly_threshold", m.AnomalyThreshold),
+		)
+
+		// Only write the status if not already written
+		if !state.ResponseWritten {
+			w.WriteHeader(state.StatusCode)
+			state.ResponseWritten = true
+		}
+
 		return true
 	}
+
 	return false
 }
 
@@ -344,23 +360,27 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 					zap.String("target", target),
 					zap.String("value", value),
 				)
+
+				// FIXED: Correctly interpret processRuleMatch return value
+				var shouldContinue bool
 				if phase == 3 || phase == 4 {
 					if recorder, ok := w.(*responseRecorder); ok {
-						if m.processRuleMatch(recorder, r, &rule, value, state) {
-							return // Stop processing if the rule match indicates blocking
-						}
+						shouldContinue = m.processRuleMatch(recorder, r, &rule, value, state)
 					} else {
-						if m.processRuleMatch(w, r, &rule, value, state) {
-							return // Stop processing if the rule match indicates blocking
-						}
+						shouldContinue = m.processRuleMatch(w, r, &rule, value, state)
 					}
 				} else {
-					if m.processRuleMatch(w, r, &rule, value, state) {
-						return // Stop processing if the rule match indicates blocking
-					}
+					shouldContinue = m.processRuleMatch(w, r, &rule, value, state)
 				}
-				if state.Blocked || state.ResponseWritten {
-					m.logger.Debug("Rule evaluation completed early due to blocking or response written", zap.Int("phase", phase), zap.String("rule_id", string(rule.ID)))
+
+				// If processRuleMatch returned false or state is now blocked, stop processing
+				if !shouldContinue || state.Blocked || state.ResponseWritten {
+					m.logger.Debug("Rule evaluation stopping due to blocking or rule directive",
+						zap.Int("phase", phase),
+						zap.String("rule_id", string(rule.ID)),
+						zap.Bool("continue", shouldContinue),
+						zap.Bool("blocked", state.Blocked),
+					)
 					return
 				}
 			} else {
@@ -372,6 +392,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			}
 		}
 	}
+
 	m.logger.Debug("Rule evaluation completed for phase", zap.Int("phase", phase))
 
 	if phase == 3 {

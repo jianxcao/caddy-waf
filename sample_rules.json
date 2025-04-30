@@ -1,0 +1,112 @@
+[
+  {
+    "id": "TEST-RULE-1",
+    "phase": 2,
+    "pattern": "low_score_test",
+    "targets": ["URL_PARAM:test"],
+    "severity": "low",
+    "score": 1,
+    "mode": "log",
+    "description": "Low score test rule",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-PARAM1",
+    "phase": 2,
+    "pattern": "score2",
+    "targets": ["URL_PARAM:param1"],
+    "severity": "medium",
+    "score": 2,
+    "mode": "log",
+    "description": "Medium score test rule for param1",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-PARAM2",
+    "phase": 2,
+    "pattern": "score2",
+    "targets": ["URL_PARAM:param2"],
+    "severity": "medium",
+    "score": 2,
+    "mode": "log",
+    "description": "Medium score test rule for param2",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-PARAM1-HIGH",
+    "phase": 2,
+    "pattern": "score3",
+    "targets": ["URL_PARAM:param1"],
+    "severity": "high",
+    "score": 3,
+    "mode": "log",
+    "description": "High score test rule for param1",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-PARAM2-HIGH",
+    "phase": 2,
+    "pattern": "score3",
+    "targets": ["URL_PARAM:param2"],
+    "severity": "high",
+    "score": 3,
+    "mode": "log",
+    "description": "High score test rule for param2",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-PARAM3-HIGH",
+    "phase": 2,
+    "pattern": "score3",
+    "targets": ["URL_PARAM:param3"],
+    "severity": "high",
+    "score": 3,
+    "mode": "log",
+    "description": "High score test rule for param3",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-BLOCK",
+    "phase": 2,
+    "pattern": "true",
+    "targets": ["URL_PARAM:block"],
+    "severity": "critical",
+    "score": 0,
+    "mode": "block",
+    "description": "Block action test rule",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-INCR-1",
+    "phase": 2,
+    "pattern": "score1",
+    "targets": ["URL_PARAM:increment"],
+    "severity": "low",
+    "score": 1,
+    "mode": "log",
+    "description": "Incremental test rule 1",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-INCR-2",
+    "phase": 2,
+    "pattern": "score2",
+    "targets": ["URL_PARAM:increment"],
+    "severity": "medium",
+    "score": 2,
+    "mode": "log",
+    "description": "Incremental test rule 2",
+    "priority": 10
+  },
+  {
+    "id": "TEST-RULE-INCR-3",
+    "phase": 2,
+    "pattern": "score3",
+    "targets": ["URL_PARAM:increment"],
+    "severity": "high",
+    "score": 3,
+    "mode": "log",
+    "description": "Incremental test rule 3",
+    "priority": 10
+  }
+]
