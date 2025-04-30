@@ -23,10 +23,11 @@ import (
 // ==================== Constants and Globals ====================
 
 var (
+	_ caddy.Module                = (*Middleware)(nil) // <-- AGGIUNGI QUESTA RIGA!
 	_ caddy.Provisioner           = (*Middleware)(nil)
 	_ caddyhttp.MiddlewareHandler = (*Middleware)(nil)
 	_ caddyfile.Unmarshaler       = (*Middleware)(nil)
-	_ caddy.Validator             = (*Middleware)(nil)
+	_ caddy.Validator             = (*Middleware)(nil) // Assicurati che anche questa sia presente se hai un metodo Validate()
 )
 
 // Add or update the version constant as needed
@@ -35,7 +36,7 @@ const wafVersion = "v0.0.5" // update this value to the new release version when
 // ==================== Initialization and Setup ====================
 
 func init() {
-	caddy.RegisterModule(&Middleware{}) // Uncommented this line to properly register the module
+	caddy.RegisterModule(&Middleware{}) // Register the module with Caddy
 	httpcaddyfile.RegisterHandlerDirective("waf", parseCaddyfile)
 }
 

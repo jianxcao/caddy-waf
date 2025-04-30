@@ -20,9 +20,11 @@ import (
 // ==================== Constants and Globals ====================
 
 var (
+	_ caddy.Module                = (*Middleware)(nil)
 	_ caddy.Provisioner           = (*Middleware)(nil)
 	_ caddyhttp.MiddlewareHandler = (*Middleware)(nil)
 	_ caddyfile.Unmarshaler       = (*Middleware)(nil)
+	_ caddy.Validator             = (*Middleware)(nil)
 )
 
 // Define custom types for rule hits
