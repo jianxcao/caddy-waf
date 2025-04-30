@@ -223,13 +223,12 @@
     "pattern": "(?i)(?:\\b(?:select|insert|update|delete|drop|alter|truncate|create|grant|revoke)\\b(?:\\s|\\/\\*.*?\\*\\/|--.*?)?(?:from|into|where|table|index|user|procedure|function|database)\\b|\\bunion\\b(?:\\s|\\/\\*.*?\\*\\/|--.*?)?(?:all|distinct)?(?:\\s|\\/\\*.*?\\*\\/|--.*?)?\\bselect\\b|'\\s*(?:and|or)\\s*['\\d]+\\s*(?:=|[<>]=?|!=)\\s*['\\d]+|\\)\\s*(?:and|or)\\s*\\([\\d]+\\s*(?:=|[<>]=?|!=)\\s*[\\d]+\\)|\\b(?:sleep|benchmark|waitfor\\s+delay)\\s*\\(|(?:\\bexec\\b|xp_cmdshell))",
     "targets": [
       "ARGS",
-      "BODY",
-      "HEADERS"
+      "BODY"
     ],
     "severity": "HIGH",
     "action": "block",
     "score": 7,
-    "description": "Block SQL injection attempts in request arguments, body, and headers."
+    "description": "Block SQL injection attempts in request arguments and body. Removed HEADERS target to avoid false positives."
   },
   {
     "id": "sql-injection-improved-basic",
@@ -249,14 +248,12 @@
     "phase": 2,
     "pattern": "(?i)(?:(?:https?|ftp|gopher|dict|ldap|tftp|file)://(?:[^/]+@)?(?:(?:127\\.0\\.0\\.\\d{1,3}|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.(?:1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}|192\\.168\\.\\d{1,3}\\.\\d{1,3}|169\\.254\\.\\d{1,3}\\.\\d{1,3}|(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4})|localhost|0\\.0\\.0\\.0|::1|\\d{1,10})|[^/]+\\.(?:internal|local|intranet|test))(?:\\:\\d{1,5})?(?:/[^\\s]*)?|\\b(?:metadata|aws|digitalocean|google|azure)\\b|\\b(?:169\\.254\\.\\d{1,3}\\.\\d{1,3})\\b(?:/[^\\s]*)?)",
     "targets": [
-      "BODY",
-      "HEADERS",
-      "COOKIES"
+      "BODY"
     ],
     "severity": "HIGH",
     "action": "block",
     "score": 9,
-    "description": "Block Server-Side Request Forgery (SSRF) attempts, including internal IP ranges and cloud metadata endpoints, in body, headers and cookies. Improved pattern matching, more aggressive and includes Azure metadata service."
+    "description": "Block Server-Side Request Forgery (SSRF) attempts, including internal IP ranges and cloud metadata endpoints. Removed HEADERS and COOKIES targets to prevent false positives with browser cookies."
   },
   {
     "id": "ssrf-internal-ip",
@@ -289,14 +286,12 @@
     "phase": 2,
     "pattern": "(?i)(?:\\{\\{.*?\\}\\}|\\{\\%.*?\\%\\}|\\$\\{.*?\\}|\\#\\{.*?\\}|\\$\\(.*?\\)|\\{\\*.*?\\*\\}|\\#\\*.*?\\*\\#|<%[=]?.*?%>|@\\{.*?\\}|\\b(?:Runtime|Process|exec|System|getClass|ClassLoader|loadLibrary|forName|newInstance|getMethod|invoke|getConstructor|getDeclaredMethod|getDeclaredField|setAccessible|getDeclaredConstructor|getInputStream|getOutputStream|get|put|setAttribute|getProperty|setProperty|setSecurityManager|load|defineClass|new|clone|readObject|writeObject|call|apply|bind|super)\\b\\s*\\(|\\b(?:T|Math|Object|String|Boolean|Number|BigInteger|BigDecimal|Date|List|Map|Set|Queue|Array|Tuple|Pattern|Locale|Class|ClassLoader|Proxy|SecurityManager|Thread|ThreadGroup)\\b)",
     "targets": [
-      "BODY",
-      "HEADERS",
-      "COOKIES"
+      "BODY"
     ],
     "severity": "HIGH",
     "action": "block",
     "score": 9,
-    "description": "Block Server-Side Template Injection (SSTI) attacks in request body, headers, and cookies. Targets common template syntax and dangerous keywords for various frameworks."
+    "description": "Block Server-Side Template Injection (SSTI) attacks in request body. Removed HEADERS and COOKIES targets to prevent false positives."
   },
   {
     "id": "unusual-paths",
@@ -329,13 +324,12 @@
     "pattern": "(?i)(?:<script[^>]*>|<img[^>]*\\s+onerror=|javascript:|data:|vbscript:|<svg[^>]*\\s+onload=|alert\\(|document\\.(?:cookie|location)|eval\\(|base64_(?:encode|decode)|expression\\(|\\b(?:on(?:mouse(?:over|out|down|up|move)|focus|blur|click|key(?:press|down|up)|load|error|submit|reset|change))\\s*=|\\bstyle\\s*=|(?:&#[xX]?[0-9a-fA-F]+;)+|%[0-9a-fA-F]{2,}|\\biframe[^>]*srcdoc\\s*=)",
     "targets": [
       "ARGS",
-      "BODY",
-      "HEADERS"
+      "BODY"
     ],
     "severity": "HIGH",
     "action": "block",
     "score": 8,
-    "description": "Improved XSS rule to catch encoded payloads and iframe srcdoc."
+    "description": "Improved XSS rule to catch encoded payloads and iframe srcdoc. Removed HEADERS target to prevent false positives."
   },
   {
     "id": "browser-integrity-sec-fetch-dest-missing-block",
@@ -345,9 +339,9 @@
       "HEADERS:Sec-Fetch-Dest-Presence-Check"
     ],
     "severity": "CRITICAL",
-    "action": "block",
-    "score": 10,
-    "description": "BLOCK: Requests missing Sec-Fetch-Dest header. Very strong indicator of non-browser traffic. High confidence, low false positive risk in modern browsers."
+    "action": "log",
+    "score": 5,
+    "description": "Changed to LOG: Requests missing Sec-Fetch-Dest header. Very strong indicator of non-browser traffic but can cause issues with normal browsers."
   },
   {
     "id": "browser-integrity-sec-fetch-mode-missing-log-score",
@@ -358,7 +352,7 @@
     ],
     "severity": "MEDIUM",
     "action": "log",
-    "score": 5,
+    "score": 3,
     "description": "LOG+SCORE: Requests missing Sec-Fetch-Mode header. Suspicious, might be non-browser. Moderate confidence, low to moderate false positive risk. Assigns score."
   },
   {
@@ -370,7 +364,7 @@
     ],
     "severity": "LOW",
     "action": "log",
-    "score": 3,
+    "score": 1,
     "description": "LOG+SCORE: Requests missing Sec-Fetch-Site header. Less critical but still worth monitoring. Lower confidence, slightly higher false positive risk. Assigns score."
   },
   {
@@ -382,7 +376,7 @@
     ],
     "severity": "LOW",
     "action": "log",
-    "score": 2,
+    "score": 1,
     "description": "LOG+SCORE: Requests missing Sec-Fetch-User header. Might indicate non-user-initiated actions or bots. Lowest confidence, moderate to higher false positive risk. Assigns score, mainly for correlation."
   },
   {
@@ -394,7 +388,7 @@
     ],
     "severity": "MEDIUM",
     "action": "log",
-    "score": 6,
+    "score": 3,
     "description": "LOG+SCORE: Sec-Fetch-Dest not 'document' AND Suspicious User-Agent. More suspicious combination. Moderate confidence, reduced false positive risk by combining checks. Assigns score."
   },
   {
@@ -406,7 +400,7 @@
     ],
     "severity": "LOW",
     "action": "log",
-    "score": 3,
+    "score": 2,
     "description": "LOG+SCORE: 'document' requests with Sec-Fetch-Mode: 'no-cors'. Less common for initial page loads. Lower confidence, low false positive risk. Assigns score."
   },
   {
@@ -418,7 +412,7 @@
     ],
     "severity": "LOW",
     "action": "log",
-    "score": 2,
+    "score": 1,
     "description": "LOG+SCORE: 'document' requests with Sec-Fetch-Site: 'cross-site'. Common for external links, primarily for monitoring cross-site traffic patterns. Lowest confidence, very low false positive risk. Assigns score for traffic analysis."
   }
 ]
