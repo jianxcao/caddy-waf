@@ -1,5 +1,5 @@
 # Use a Go base image to build the Caddy binary
-FROM golang:1.22.3-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install git and xcaddy (required for cloning the repository and building Caddy)
 RUN apk add --no-cache git wget && \
@@ -14,10 +14,7 @@ RUN git clone https://github.com/fabriziosalmi/caddy-waf.git
 # Navigate into the caddy-waf directory
 WORKDIR /app/caddy-waf
 
-# Fetch and install the required Go modules (including Caddy v2)
-RUN go get -v github.com/caddyserver/caddy/v2 github.com/caddyserver/caddy/v2/caddyconfig/caddyfile github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile github.com/caddyserver/caddy/v2 github.com/caddyserver/caddy/v2/modules/caddyhttp github.com/oschwald/maxminddb-golang github.com/fsnotify/fsnotify github.com/fabriziosalmi/caddy-waf
-
-# Clean up and update the go.mod file
+# Clean up and update the go.mod file (dependencies are already defined in go.mod)
 RUN go mod tidy
 
 # Download the GeoLite2 Country database

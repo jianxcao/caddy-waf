@@ -1,0 +1,19 @@
+services:
+  caddy-waf:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/app/Caddyfile:ro
+      - ./rules.json:/app/rules.json:ro
+      - ./ip_blacklist.txt:/app/ip_blacklist.txt:ro
+      - ./dns_blacklist.txt:/app/dns_blacklist.txt:ro
+    restart: unless-stopped
+    environment:
+      - CADDY_ADMIN=0.0.0.0:2019
+    networks:
+      - caddy-waf-net
+
+networks:
+  caddy-waf-net:
+    driver: bridge
