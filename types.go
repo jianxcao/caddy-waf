@@ -143,7 +143,20 @@ type WAFState struct {
 	ResponseWritten bool
 }
 
-// Middleware struct
+// Middleware is the main WAF middleware struct that implements Caddy's
+// Module, Provisioner, Validator, and MiddlewareHandler interfaces.
+//
+// It provides comprehensive web application firewall functionality including:
+//   - Rule-based request filtering
+//   - IP and DNS blacklisting
+//   - Geographic access control
+//   - Rate limiting
+//   - Anomaly detection
+//   - Custom response handling
+//   - Real-time metrics and monitoring
+//
+// The middleware can be configured via Caddyfile or JSON and integrates
+// seamlessly into Caddy's request processing pipeline.
 type Middleware struct {
 	mu sync.RWMutex
 

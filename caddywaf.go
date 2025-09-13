@@ -1,3 +1,18 @@
+// Package caddywaf implements a Web Application Firewall (WAF) middleware for Caddy.
+//
+// This package provides comprehensive security features including:
+//   - Regex-based filtering for URLs, data, and headers
+//   - IP and DNS blacklisting capabilities
+//   - Geographic access control
+//   - Rate limiting
+//   - Anomaly detection and scoring
+//   - Multi-phase request inspection
+//   - Real-time metrics and monitoring
+//
+// The WAF integrates seamlessly with Caddy as an HTTP handler middleware
+// and can be configured via Caddyfile or JSON configuration.
+//
+// Module ID: http.handlers.waf
 package caddywaf
 
 import (
@@ -31,7 +46,7 @@ var (
 )
 
 // Add or update the version constant as needed
-const wafVersion = "v0.0.5" // update this value to the new release version when tagging
+const wafVersion = "v0.0.6" // update this value to the new release version when tagging
 
 // ==================== Initialization and Setup ====================
 
