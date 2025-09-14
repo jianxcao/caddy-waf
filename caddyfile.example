@@ -1,0 +1,75 @@
+# Example Caddyfile showing caddy-waf module usage
+# This is a basic configuration example for the Caddy WAF middleware
+
+{
+    auto_https off
+    admin localhost:2019
+}
+
+# Example 1: Basic WAF setup
+example.com {
+    # Enable WAF protection with basic configuration
+    waf {
+        # Rule file for WAF rules
+        rule_file rules.json
+        
+        # IP blacklist file
+        ip_blacklist_file ip_blacklist.txt
+        
+        # DNS blacklist file  
+        dns_blacklist_file dns_blacklist.txt
+        
+        # Metrics endpoint
+        metrics_endpoint /waf_metrics
+        
+        # Anomaly threshold
+        anomaly_threshold 10
+        
+        # Log settings
+        log_level info
+        log_file waf.log
+    }
+    
+    # Your web application
+    respond "Hello, World! Protected by Caddy WAF"
+}
+
+# Example 2: Advanced WAF configuration with rate limiting
+api.example.com {
+    waf {
+        rule_file rules.json
+        ip_blacklist_file ip_blacklist.txt
+        dns_blacklist_file dns_blacklist.txt
+        metrics_endpoint /waf_metrics
+        
+        # Rate limiting configuration
+        rate_limit {
+            requests 100
+            window 10s
+            paths "/api/*" "/admin/*"
+        }
+        
+        # Country blocking
+        country_block {
+            enabled true
+            countries CN RU
+            geoip_db_path GeoLite2-Country.mmdb
+        }
+        
+        # Custom response for blocked requests
+        custom_response {
+            status_code 403
+            body "Access Denied by WAF"
+        }
+        
+        # Anomaly threshold
+        anomaly_threshold 15
+        
+        # Logging
+        log_level debug
+        log_file api_waf.log
+        log_json true
+    }
+    
+    reverse_proxy localhost:8080
+}
