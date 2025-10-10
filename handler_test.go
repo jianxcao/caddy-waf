@@ -47,17 +47,26 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 	// Verify that the request was blocked
 	assert.True(t, state.Blocked, "Request should be blocked")
 	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	assert.Contains(t, w.Body.String(), "Reason: dns_blacklist", "Block reason should be 'dns_blacklist'")
 }
 
 func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
-	logger := zap.NewNop()
+
+	logger, err := zap.NewDevelopment()
+	assert.NoError(t, err)
+
+	geoIPHandler := NewGeoIPHandler(logger)
+	geoIPBlock, err := geoIPHandler.LoadGeoIPDatabase(geoIPdata)
+	assert.NoError(t, err)
+
 	middleware := &Middleware{
-		logger: logger,
+		logger:       logger,
+		geoIPHandler: geoIPHandler,
 		CountryBlock: CountryAccessFilter{
 			Enabled:     true,
 			CountryList: []string{"US"},
-			GeoIPDBPath: "testdata/GeoIP2-Country-Test.mmdb", // Path to a test GeoIP database
+			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
+			geoIP:       geoIPBlock,
 		},
 		CustomResponses: map[int]CustomBlockResponse{
 			403: {
@@ -69,7 +78,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 
 	// Simulate a request from a blocked country (US)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = "192.168.1.1:12345" // IP from the US (mocked in the test GeoIP database)
+	req.RemoteAddr = googleUSIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -79,7 +88,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	// Verify that the request was blocked
 	assert.True(t, state.Blocked, "Request should be blocked")
 	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	assert.Contains(t, w.Body.String(), "Reason: country_block", "Block reason should be 'country_block'")
 }
 
 func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
