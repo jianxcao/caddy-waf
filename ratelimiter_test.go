@@ -404,7 +404,7 @@ func TestBlockedRequestPhase1_RateLimiting(t *testing.T) {
 
 	// Simulate two requests from the same IP
 	req := httptest.NewRequest("GET", "http://example.com/api/test", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req.RemoteAddr = localIP
 	w1 := httptest.NewRecorder()
 	w2 := httptest.NewRecorder()
 	state1 := &WAFState{}

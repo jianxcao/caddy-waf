@@ -36,6 +36,7 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 
 	// Simulate a request to a blacklisted domain
 	req := httptest.NewRequest("GET", "http://malicious.domain", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -97,7 +98,7 @@ func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 	assert.NoError(t, err)
 
 	ipBlackList := trie.NewTrie()
-	ipBlackList.Insert(netip.MustParsePrefix("127.0.0.1"), nil)
+	ipBlackList.Insert(netip.MustParsePrefix("127.0.0.1/24"), nil)
 
 	middleware := &Middleware{
 		logger:      logger,
@@ -111,7 +112,7 @@ func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = "127.0.0.1"
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -208,6 +209,7 @@ func TestBlockedRequestPhase1_HeaderRegex(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "this-is-a-bad-header") // Simulate a request with bad header
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -260,6 +262,7 @@ func TestBlockedRequestPhase1_HeaderRegex_SpecificValue(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Specific-Header", "specific-value") // Simulate a request with the specific header
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -312,6 +315,7 @@ func TestBlockedRequestPhase1_HeaderRegex_CommaSeparatedTargets(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header1", "good-value")
 	req.Header.Set("X-Custom-Header2", "bad-value") // Simulate a request with bad value in one of the headers
 
@@ -365,6 +369,7 @@ func TestBlockedRequestPhase1_CombinedConditions(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://bad-host.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("User-Agent", "good-user")
 
 	// Create a context and add logID to it
@@ -417,6 +422,7 @@ func TestBlockedRequestPhase1_NoMatch(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("User-Agent", "good-user")
 
 	// Create a context and add logID to it
@@ -469,6 +475,7 @@ func TestBlockedRequestPhase1_HeaderRegex_EmptyHeader(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 
 	// Create a context and add logID to it
 	ctx := context.Background()
@@ -519,6 +526,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MissingHeader(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil) // Header not set
+	req.RemoteAddr = localIP
 
 	// Create a context and add logID to it
 	ctx := context.Background()
@@ -571,6 +579,7 @@ func TestBlockedRequestPhase1_HeaderRegex_ComplexPattern(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Email-Header", "test@example.com") // Simulate a request with a valid email
 
 	// Create a context and add logID to it
@@ -623,6 +632,7 @@ func TestBlockedRequestPhase1_MultiTargetMatch(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "good-header")
 	req.Header.Set("User-Agent", "bad-user-agent")
 
@@ -675,6 +685,7 @@ func TestBlockedRequestPhase1_MultiTargetNoMatch(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "good-header")
 	req.Header.Set("User-Agent", "good-user-agent")
 
@@ -728,6 +739,7 @@ func TestBlockedRequestPhase1_URLParameterRegex_NoMatch(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com?param1=good-param-value¶m2=good-value", nil)
+	req.RemoteAddr = localIP
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
 	ctx := context.Background()
@@ -787,6 +799,7 @@ func TestBlockedRequestPhase1_MultipleRules(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://bad-host.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("User-Agent", "bad-user") // Simulate a request with a bad user agent
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -809,6 +822,7 @@ func TestBlockedRequestPhase1_MultipleRules(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Blocked by Multiple Rules", "Response body should contain 'Blocked by Multiple Rules'")
 
 	req2 := httptest.NewRequest("GET", "http://good-host.com", nil)
+	req2.RemoteAddr = localIP
 	req2.Header.Set("User-Agent", "bad-user") // Simulate a request with a bad user agent
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE for req2 as well!
@@ -867,6 +881,7 @@ func TestBlockedRequestPhase2_BodyRegex(t *testing.T) {
 			return b
 		}(), // Simulate a request with bad body
 	)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", "text/plain")
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -925,6 +940,7 @@ func TestBlockedRequestPhase2_BodyRegex_JSON(t *testing.T) {
 			return b
 		}(), // Simulate a request with JSON body
 	)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", "application/json")
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -979,6 +995,7 @@ func TestBlockedRequestPhase2_BodyRegex_FormURLEncoded(t *testing.T) {
 	req := httptest.NewRequest("POST", "http://example.com",
 		strings.NewReader("param1=value1&secret=badvalue¶m2=value2"),
 	)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -1037,6 +1054,7 @@ func TestBlockedRequestPhase2_BodyRegex_SpecificPattern(t *testing.T) {
 			return b
 		}(),
 	)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", "text/plain") // Setting content type
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -1095,6 +1113,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch(t *testing.T) {
 			return b
 		}(),
 	)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", "text/plain")
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -1162,6 +1181,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch_MultipartForm(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("POST", "http://example.com", body)
+	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -1214,6 +1234,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoBody(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("POST", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -1267,6 +1288,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoMatch(t *testing.T) {
 	}()
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -1321,6 +1343,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_EmptyBody(t *testing.T) {
 	}()
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 	err := middleware.ServeHTTP(w, req, mockHandler)
@@ -1376,6 +1399,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_NoBody(t *testing.T) {
 	}()
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 	err := middleware.ServeHTTP(w, req, mockHandler)
@@ -1429,6 +1453,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoSetCookie(t *testing.T) {
 	}()
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 	err := middleware.ServeHTTP(w, req, mockHandler)
@@ -1477,6 +1502,7 @@ func TestBlockedRequestPhase1_HeaderRegex_CaseInsensitive(t *testing.T) {
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "bAd-VaLuE") // Test with mixed-case header value
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -1529,6 +1555,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header1", "bad-value")
 	req.Header.Set("X-Custom-Header2", "bad-value") // Both headers have a "bad" value
 
@@ -1552,6 +1579,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 	assert.Contains(t, w.Body.String(), "Blocked by Multiple Matching Headers Regex", "Response body should contain 'Blocked by Multiple Matching Headers Regex'")
 
 	req2 := httptest.NewRequest("GET", "http://example.com", nil)
+	req2.RemoteAddr = localIP
 	req2.Header.Set("X-Custom-Header1", "good-value")
 	req2.Header.Set("X-Custom-Header2", "bad-value") // One header has a "bad" value
 
@@ -1575,6 +1603,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 	assert.Contains(t, w2.Body.String(), "Blocked by Multiple Matching Headers Regex", "Response body should contain 'Blocked by Multiple Matching Headers Regex'")
 
 	req3 := httptest.NewRequest("GET", "http://example.com", nil)
+	req3.RemoteAddr = localIP
 	req3.Header.Set("X-Custom-Header1", "good-value")
 	req3.Header.Set("X-Custom-Header2", "good-value") // None headers have a "bad" value
 
@@ -1634,7 +1663,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 
 	// Test path 1
 	req1 := httptest.NewRequest("GET", "/api/v1/users", nil)
-	req1.RemoteAddr = "192.168.1.1:12345"
+	req1.RemoteAddr = localIP
 	w1 := httptest.NewRecorder()
 	state1 := &WAFState{}
 
@@ -1643,7 +1672,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w1.Code, "Expected status code 200")
 
 	req2 := httptest.NewRequest("GET", "/api/v1/users", nil)
-	req2.RemoteAddr = "192.168.1.1:12345"
+	req2.RemoteAddr = localIP
 	w2 := httptest.NewRecorder()
 	state2 := &WAFState{}
 	middleware.handlePhase(w2, req2, 1, state2)
@@ -1652,7 +1681,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 
 	// Test path 2
 	req3 := httptest.NewRequest("GET", "/admin/dashboard", nil)
-	req3.RemoteAddr = "192.168.1.1:12345"
+	req3.RemoteAddr = localIP
 	w3 := httptest.NewRecorder()
 	state3 := &WAFState{}
 	middleware.handlePhase(w3, req3, 1, state3)
@@ -1660,7 +1689,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w3.Code, "Expected status code 200")
 
 	req4 := httptest.NewRequest("GET", "/admin/dashboard", nil)
-	req4.RemoteAddr = "192.168.1.1:12345"
+	req4.RemoteAddr = localIP
 	w4 := httptest.NewRecorder()
 	state4 := &WAFState{}
 	middleware.handlePhase(w4, req4, 1, state4)
@@ -1668,7 +1697,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, w4.Code, "Expected status code 429")
 
 	req5 := httptest.NewRequest("GET", "/not-rate-limited", nil)
-	req5.RemoteAddr = "192.168.1.1:12345"
+	req5.RemoteAddr = localIP
 	w5 := httptest.NewRecorder()
 	state5 := &WAFState{}
 	middleware.handlePhase(w5, req5, 1, state5)
@@ -1704,7 +1733,7 @@ func TestBlockedRequestPhase1_RateLimiting_DifferentIPs(t *testing.T) {
 
 	// Test different IPs
 	req1 := httptest.NewRequest("GET", "/api/users", nil)
-	req1.RemoteAddr = "192.168.1.1:12345"
+	req1.RemoteAddr = localIP
 	w1 := httptest.NewRecorder()
 	state1 := &WAFState{}
 
@@ -1713,7 +1742,7 @@ func TestBlockedRequestPhase1_RateLimiting_DifferentIPs(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w1.Code, "Expected status code 200")
 
 	req2 := httptest.NewRequest("GET", "/api/users", nil)
-	req2.RemoteAddr = "192.168.1.2:12345"
+	req2.RemoteAddr = "192.168.1.2"
 	w2 := httptest.NewRecorder()
 	state2 := &WAFState{}
 	middleware.handlePhase(w2, req2, 1, state2)
@@ -1721,7 +1750,7 @@ func TestBlockedRequestPhase1_RateLimiting_DifferentIPs(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w2.Code, "Expected status code 200")
 
 	req3 := httptest.NewRequest("GET", "/api/users", nil)
-	req3.RemoteAddr = "192.168.1.1:12345"
+	req3.RemoteAddr = localIP
 	w3 := httptest.NewRecorder()
 	state3 := &WAFState{}
 	middleware.handlePhase(w3, req3, 1, state3)
@@ -1757,7 +1786,7 @@ func TestBlockedRequestPhase1_RateLimiting_MatchAllPaths(t *testing.T) {
 
 	// Test with match all paths
 	req1 := httptest.NewRequest("GET", "/api/users", nil)
-	req1.RemoteAddr = "192.168.1.1:12345"
+	req1.RemoteAddr = localIP
 	w1 := httptest.NewRecorder()
 	state1 := &WAFState{}
 	middleware.handlePhase(w1, req1, 1, state1)
@@ -1765,7 +1794,7 @@ func TestBlockedRequestPhase1_RateLimiting_MatchAllPaths(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w1.Code, "Expected status code 200")
 
 	req2 := httptest.NewRequest("GET", "/api/users", nil)
-	req2.RemoteAddr = "192.168.1.1:12345"
+	req2.RemoteAddr = localIP
 	w2 := httptest.NewRecorder()
 	state2 := &WAFState{}
 
@@ -1774,7 +1803,7 @@ func TestBlockedRequestPhase1_RateLimiting_MatchAllPaths(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, w2.Code, "Expected status code 429")
 
 	req3 := httptest.NewRequest("GET", "/some-other-path", nil)
-	req3.RemoteAddr = "192.168.1.1:12345"
+	req3.RemoteAddr = localIP
 	w3 := httptest.NewRecorder()
 	state3 := &WAFState{}
 	middleware.handlePhase(w3, req3, 1, state3)
