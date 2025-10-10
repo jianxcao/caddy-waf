@@ -1,7 +1,6 @@
 package caddywaf
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -15,7 +14,7 @@ func TestLoadDNSBlacklistFromFile(t *testing.T) {
 malicious.com
    spaces.com   
 `
-	tmpfile, err := ioutil.TempFile("", "dnsblacklist")
+	tmpfile, err := os.CreateTemp("", "dnsblacklist")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +59,7 @@ func TestLoadIPBlacklistFromFile(t *testing.T) {
    172.16.1.1   
 invalid-ip
 `
-	tmpfile, err := ioutil.TempFile("", "ipblacklist")
+	tmpfile, err := os.CreateTemp("", "ipblacklist")
 	if err != nil {
 		t.Fatal(err)
 	}
