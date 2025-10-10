@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -397,7 +398,7 @@ func TestBlockedRequestPhase1_RateLimiting(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  NewCIDRTrie(),             // Initialize ipBlacklist
+		ipBlacklist:  trie.NewTrie(),            // Initialize ipBlacklist
 		dnsBlacklist: make(map[string]struct{}), // Initialize dnsBlacklist
 	}
 

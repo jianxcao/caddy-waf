@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -442,7 +444,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 		rateLimiter: func() *RateLimiter {
@@ -465,7 +467,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 	}
 
 	// Add some IPs to the blacklist
-	middleware.ipBlacklist.Insert("192.168.1.0/24")
+	middleware.ipBlacklist.Insert(netip.MustParsePrefix("192.168.1.0/24"), nil)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {

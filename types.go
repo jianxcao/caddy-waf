@@ -1,8 +1,6 @@
 package caddywaf
 
 import (
-	"fmt"
-	"net"
 	"regexp"
 	"sync"
 	"time"
@@ -11,6 +9,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/oschwald/maxminddb-golang"
+	trie "github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -30,68 +29,6 @@ var (
 // Define custom types for rule hits
 type RuleID string
 type HitCount int
-
-// ==================== Struct Definitions ====================
-type TrieNode struct {
-	children map[byte]*TrieNode
-	isLeaf   bool
-}
-
-func NewTrieNode() *TrieNode {
-	return &TrieNode{
-		children: make(map[byte]*TrieNode), // Initialize the map
-		isLeaf:   false,
-	}
-}
-
-type CIDRTrie struct {
-	ipv4Root *TrieNode
-	ipv6Root *TrieNode
-	mu       sync.RWMutex
-}
-
-func NewCIDRTrie() *CIDRTrie {
-	return &CIDRTrie{
-		ipv4Root: NewTrieNode(), // Initialize with a new TrieNode
-		ipv6Root: NewTrieNode(), // Initialize with a new TrieNode
-	}
-}
-
-func (t *CIDRTrie) Insert(cidr string) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	ip, ipNet, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return err
-	}
-
-	if ip.To4() != nil {
-		// IPv4
-		return t.insertIPv4(ipNet)
-	} else {
-		// IPv6
-		return t.insertIPv6(ipNet)
-	}
-}
-
-func (t *CIDRTrie) Contains(ipStr string) bool {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return false
-	}
-
-	if ip.To4() != nil {
-		// IPv4
-		return t.containsIPv4(ip)
-	} else {
-		// IPv6
-		return t.containsIPv6(ip)
-	}
-}
 
 // RuleCache caches compiled regex patterns for rules.
 type RuleCache struct {
@@ -167,7 +104,7 @@ type Middleware struct {
 	CountryBlock     CountryAccessFilter `json:"country_block"`
 	CountryWhitelist CountryAccessFilter `json:"country_whitelist"`
 	Rules            map[int][]Rule      `json:"-"`
-	ipBlacklist      *CIDRTrie           `json:"-"` // Changed to CIDRTrie
+	ipBlacklist      *trie.Trie          `json:"-"`
 	dnsBlacklist     map[string]struct{} `json:"-"` // Changed to map[string]struct{}
 	logger           *zap.Logger
 	LogSeverity      string `json:"log_severity,omitempty"`
@@ -243,91 +180,4 @@ func (rc *RuleCache) Set(ruleID string, regex *regexp.Regexp) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 	rc.rules[ruleID] = regex
-}
-
-func (t *CIDRTrie) insertIPv4(ipNet *net.IPNet) error {
-	ip := ipNet.IP.To4()
-	if ip == nil {
-		return fmt.Errorf("invalid IPv4 address")
-	}
-
-	mask, _ := ipNet.Mask.Size()
-	node := t.ipv4Root
-
-	for i := 0; i < mask; i++ {
-		bit := (ip[i/8] >> (7 - uint(i%8))) & 1
-		if node.children[bit] == nil {
-			node.children[bit] = NewTrieNode() // Initialize the child node
-		}
-		node = node.children[bit]
-	}
-
-	node.isLeaf = true
-	return nil
-}
-
-func (t *CIDRTrie) insertIPv6(ipNet *net.IPNet) error {
-	ip := ipNet.IP.To16()
-	if ip == nil {
-		return fmt.Errorf("invalid IPv6 address")
-	}
-
-	mask, _ := ipNet.Mask.Size()
-	node := t.ipv6Root
-
-	for i := 0; i < mask; i++ {
-		bit := (ip[i/8] >> (7 - uint(i%8))) & 1
-		if node.children[bit] == nil {
-			node.children[bit] = NewTrieNode() // Initialize the child node
-		}
-		node = node.children[bit]
-	}
-
-	node.isLeaf = true
-	return nil
-}
-
-func (t *CIDRTrie) containsIPv4(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
-		return false
-	}
-
-	node := t.ipv4Root
-	for i := 0; i < len(ip)*8; i++ {
-		bit := (ip[i/8] >> (7 - uint(i%8))) & 1
-		if node.children[bit] == nil {
-			return false
-		}
-		node = node.children[bit]
-		if node.isLeaf {
-			return true
-		}
-	}
-	return node.isLeaf
-}
-
-func (t *CIDRTrie) containsIPv6(ip net.IP) bool {
-	ip = ip.To16()
-	if ip == nil {
-		return false
-	}
-
-	// Add this check to ensure ip is not empty
-	if len(ip) == 0 {
-		return false
-	}
-
-	node := t.ipv6Root
-	for i := 0; i < len(ip)*8; i++ {
-		bit := (ip[i/8] >> (7 - uint(i%8))) & 1
-		if node.children[bit] == nil {
-			return false
-		}
-		node = node.children[bit]
-		if node.isLeaf {
-			return true
-		}
-	}
-	return false
 }

@@ -6,12 +6,14 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -23,7 +25,7 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 		dnsBlacklist: map[string]struct{}{
 			"malicious.domain": {},
 		},
-		ipBlacklist: NewCIDRTrie(), // Initialize ipBlacklist
+		ipBlacklist: trie.NewTrie(),
 		CustomResponses: map[int]CustomBlockResponse{
 			403: {
 				StatusCode: http.StatusForbidden,
@@ -90,6 +92,38 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
 }
 
+func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	assert.NoError(t, err)
+
+	ipBlackList := trie.NewTrie()
+	ipBlackList.Insert(netip.MustParsePrefix("127.0.0.1"), nil)
+
+	middleware := &Middleware{
+		logger:      logger,
+		ipBlacklist: ipBlackList,
+		CustomResponses: map[int]CustomBlockResponse{
+			403: {
+				StatusCode: http.StatusForbidden,
+				Body:       "Access Denied",
+			},
+		},
+	}
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "127.0.0.1"
+	w := httptest.NewRecorder()
+	state := &WAFState{}
+
+	// Process the request in Phase 1
+	middleware.handlePhase(w, req, 1, state)
+
+	// Verify that the request was blocked
+	assert.True(t, state.Blocked, "Request should be blocked")
+	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+}
+
 func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 	logger := zap.NewNop()
 	middleware := &Middleware{
@@ -108,7 +142,7 @@ func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 		CustomResponses: map[int]CustomBlockResponse{
@@ -168,7 +202,7 @@ func TestBlockedRequestPhase1_HeaderRegex(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -220,7 +254,7 @@ func TestBlockedRequestPhase1_HeaderRegex_SpecificValue(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -272,7 +306,7 @@ func TestBlockedRequestPhase1_HeaderRegex_CommaSeparatedTargets(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -325,7 +359,7 @@ func TestBlockedRequestPhase1_CombinedConditions(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -377,7 +411,7 @@ func TestBlockedRequestPhase1_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -429,7 +463,7 @@ func TestBlockedRequestPhase1_HeaderRegex_EmptyHeader(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -479,7 +513,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MissingHeader(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -531,7 +565,7 @@ func TestBlockedRequestPhase1_HeaderRegex_ComplexPattern(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -583,7 +617,7 @@ func TestBlockedRequestPhase1_MultiTargetMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -635,7 +669,7 @@ func TestBlockedRequestPhase1_MultiTargetNoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -688,7 +722,7 @@ func TestBlockedRequestPhase1_URLParameterRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -747,7 +781,7 @@ func TestBlockedRequestPhase1_MultipleRules(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -821,7 +855,7 @@ func TestBlockedRequestPhase2_BodyRegex(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -879,7 +913,7 @@ func TestBlockedRequestPhase2_BodyRegex_JSON(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -937,7 +971,7 @@ func TestBlockedRequestPhase2_BodyRegex_FormURLEncoded(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -991,7 +1025,7 @@ func TestBlockedRequestPhase2_BodyRegex_SpecificPattern(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1049,7 +1083,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1107,7 +1141,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch_MultipartForm(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1174,7 +1208,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1219,7 +1253,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1274,7 +1308,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_EmptyBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1329,7 +1363,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_NoBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1382,7 +1416,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoSetCookie(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1437,7 +1471,7 @@ func TestBlockedRequestPhase1_HeaderRegex_CaseInsensitive(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1489,7 +1523,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1594,7 +1628,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  NewCIDRTrie(),
+		ipBlacklist:  trie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 
@@ -1664,7 +1698,7 @@ func TestBlockedRequestPhase1_RateLimiting_DifferentIPs(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  NewCIDRTrie(),
+		ipBlacklist:  trie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 
@@ -1717,7 +1751,7 @@ func TestBlockedRequestPhase1_RateLimiting_MatchAllPaths(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  NewCIDRTrie(),
+		ipBlacklist:  trie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 
