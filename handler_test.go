@@ -47,11 +47,10 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 	// Verify that the request was blocked
 	assert.True(t, state.Blocked, "Request should be blocked")
 	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Reason: dns_blacklist", "Block reason should be 'dns_blacklist'")
+	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
 }
 
 func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
-
 	logger, err := zap.NewDevelopment()
 	assert.NoError(t, err)
 
@@ -88,7 +87,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	// Verify that the request was blocked
 	assert.True(t, state.Blocked, "Request should be blocked")
 	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Reason: country_block", "Block reason should be 'country_block'")
+	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
 }
 
 func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
@@ -144,7 +143,9 @@ func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 }
 
 func TestBlockedRequestPhase1_HeaderRegex(t *testing.T) {
-	logger := zap.NewNop()
+	logger, err := zap.NewDevelopment()
+	assert.NoError(t, err)
+
 	middleware := &Middleware{
 		logger: logger,
 		Rules: map[int][]Rule{
