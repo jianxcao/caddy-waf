@@ -30,9 +30,13 @@ func (m *Middleware) blockRequest(recorder http.ResponseWriter, r *http.Request,
 	recorder.Header().Set("Content-Type", "text/plain")
 	recorder.WriteHeader(statusCode)
 
-	message := fmt.Sprintf("Request blocked by WAF. Reason: %s", reason)
-	if _, err := recorder.Write([]byte(message)); err != nil {
-		m.logger.Error("Failed to write blocked response", zap.Error(err))
+	if m.CustomResponses != nil {
+		m.writeCustomResponse(recorder, state.StatusCode)
+	} else {
+		message := fmt.Sprintf("Request blocked by WAF. Reason: %s", reason)
+		if _, err := recorder.Write([]byte(message)); err != nil {
+			m.logger.Error("Failed to write blocked response", zap.Error(err))
+		}
 	}
 }
 

@@ -16,13 +16,14 @@ import (
 var torExitNodeURL = "https://check.torproject.org/torbulkexitlist"
 
 type TorConfig struct {
-	Enabled            bool   `json:"enabled,omitempty"`
-	TORIPBlacklistFile string `json:"tor_ip_blacklist_file,omitempty"`
-	UpdateInterval     string `json:"update_interval,omitempty"`
-	RetryOnFailure     bool   `json:"retry_on_failure,omitempty"` // Enable/disable retries
-	RetryInterval      string `json:"retry_interval,omitempty"`   // Retry interval (e.g., "5m")
-	lastUpdated        time.Time
-	logger             *zap.Logger
+	Enabled              bool   `json:"enabled,omitempty"`
+	CustomTORExitNodeURL string `json:"custom_tor_exit_node_url"`
+	TORIPBlacklistFile   string `json:"tor_ip_blacklist_file,omitempty"`
+	UpdateInterval       string `json:"update_interval,omitempty"`
+	RetryOnFailure       bool   `json:"retry_on_failure,omitempty"` // Enable/disable retries
+	RetryInterval        string `json:"retry_interval,omitempty"`   // Retry interval (e.g., "5m")
+	lastUpdated          time.Time
+	logger               *zap.Logger
 }
 
 // Provision sets up the Tor blocking configuration.
@@ -41,19 +42,24 @@ func (t *TorConfig) Provision(ctx caddy.Context) error {
 func (t *TorConfig) updateTorExitNodes() error {
 	t.logger.Debug("Updating Tor exit nodes...") // Debug log at start of update
 
-	resp, err := http.Get(torExitNodeURL)
+	url := torExitNodeURL
+	if t.CustomTORExitNodeURL != "" {
+		url = t.CustomTORExitNodeURL
+	}
+
+	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("http get failed for %s: %w", torExitNodeURL, err) // Improved error message with URL
+		return fmt.Errorf("http get failed for %s: %w", url, err) // Improved error message with URL
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("http get returned status %s for %s", resp.Status, torExitNodeURL) // Check for non-200 status
+		return fmt.Errorf("http get returned status %s for %s", resp.Status, url) // Check for non-200 status
 	}
 
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body from %s: %w", torExitNodeURL, err) // Improved error message with URL
+		return fmt.Errorf("failed to read response body from %s: %w", url, err) // Improved error message with URL
 	}
 
 	torIPs := strings.Split(string(data), "\n")

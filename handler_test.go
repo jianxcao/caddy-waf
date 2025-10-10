@@ -51,13 +51,21 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 }
 
 func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
-	logger := zap.NewNop()
+	logger, err := zap.NewDevelopment()
+	assert.NoError(t, err)
+
+	geoIPHandler := NewGeoIPHandler(logger)
+	geoIPBlock, err := geoIPHandler.LoadGeoIPDatabase(geoIPdata)
+	assert.NoError(t, err)
+
 	middleware := &Middleware{
-		logger: logger,
+		logger:       logger,
+		geoIPHandler: geoIPHandler,
 		CountryBlock: CountryAccessFilter{
 			Enabled:     true,
 			CountryList: []string{"US"},
-			GeoIPDBPath: "testdata/GeoIP2-Country-Test.mmdb", // Path to a test GeoIP database
+			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
+			geoIP:       geoIPBlock,
 		},
 		CustomResponses: map[int]CustomBlockResponse{
 			403: {
@@ -69,7 +77,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 
 	// Simulate a request from a blocked country (US)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = "192.168.1.1:12345" // IP from the US (mocked in the test GeoIP database)
+	req.RemoteAddr = googleUSIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
@@ -135,7 +143,9 @@ func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 }
 
 func TestBlockedRequestPhase1_HeaderRegex(t *testing.T) {
-	logger := zap.NewNop()
+	logger, err := zap.NewDevelopment()
+	assert.NoError(t, err)
+
 	middleware := &Middleware{
 		logger: logger,
 		Rules: map[int][]Rule{

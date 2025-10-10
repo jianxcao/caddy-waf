@@ -40,10 +40,11 @@ func TestTorConfig_Provision(t *testing.T) {
 		{
 			name: "enabled config",
 			config: TorConfig{
-				Enabled:            true,
-				TORIPBlacklistFile: tmpFile.Name(),
-				UpdateInterval:     "5m",
-				logger:             logger,
+				Enabled:              true,
+				CustomTORExitNodeURL: torListURL,
+				TORIPBlacklistFile:   tmpFile.Name(),
+				UpdateInterval:       "5m",
+				logger:               logger,
 			},
 			wantErr: false,
 		},

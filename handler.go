@@ -247,6 +247,9 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule", r.RemoteAddr,
 				zap.String("message", "Request blocked by country"))
 			m.incrementGeoIPRequestsMetric(true) // Increment with true for blocked
+			if m.CustomResponses != nil {
+				m.writeCustomResponse(w, state.StatusCode)
+			}
 			return
 		}
 		m.logger.Debug("Country blocking phase completed - not blocked")
@@ -262,6 +265,9 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			m.blockRequest(w, r, state, http.StatusTooManyRequests, "rate_limit", "rate_limit_rule", r.RemoteAddr,
 				zap.String("message", "Request blocked by rate limit"),
 			)
+			if m.CustomResponses != nil {
+				m.writeCustomResponse(w, state.StatusCode)
+			}
 			return
 		}
 		m.logger.Debug("Rate limiting phase completed - not blocked")
@@ -280,6 +286,9 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 					m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule", firstIP,
 						zap.String("message", "Request blocked by IP blacklist"),
 					)
+					if m.CustomResponses != nil {
+						m.writeCustomResponse(w, state.StatusCode)
+					}
 					return
 				}
 			} else {
@@ -294,6 +303,9 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 				m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule", r.RemoteAddr,
 					zap.String("message", "Request blocked by IP blacklist"),
 				)
+				if m.CustomResponses != nil {
+					m.writeCustomResponse(w, state.StatusCode)
+				}
 				return
 			}
 		}
@@ -305,6 +317,9 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			zap.String("message", "Request blocked by DNS blacklist"),
 			zap.String("host", r.Host),
 		)
+		if m.CustomResponses != nil {
+			m.writeCustomResponse(w, state.StatusCode)
+		}
 		return
 	}
 
@@ -381,6 +396,10 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 						zap.Bool("continue", shouldContinue),
 						zap.Bool("blocked", state.Blocked),
 					)
+
+					if m.CustomResponses != nil {
+						m.writeCustomResponse(w, state.StatusCode)
+					}
 					return
 				}
 			} else {
