@@ -11,11 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 )
 
 func TestExtractValue(t *testing.T) {

@@ -101,7 +101,6 @@ func (gh *GeoIPHandler) GetCountryCode(remoteAddr string, geoIP *maxminddb.Reade
 }
 
 func (gh *GeoIPHandler) isCountryInListWithCache(ip string, parsedIP net.IP, countryList []string, geoIP *maxminddb.Reader) (bool, error) {
-
 	// Check cache first
 	if gh.geoIPCache != nil {
 		gh.geoIPCacheMutex.RLock()
@@ -127,7 +126,6 @@ func (gh *GeoIPHandler) isCountryInListWithCache(ip string, parsedIP net.IP, cou
 }
 
 func (gh *GeoIPHandler) getCountryCodeWithCache(ip string, parsedIP net.IP, geoIP *maxminddb.Reader) string {
-
 	// Check cache first for GetCountryCode as well for consistency and potential perf gain
 	if gh.geoIPCache != nil {
 		gh.geoIPCacheMutex.RLock()

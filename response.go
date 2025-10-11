@@ -62,7 +62,6 @@ func NewResponseRecorder(w http.ResponseWriter) *responseRecorder {
 func (r *responseRecorder) WriteHeader(statusCode int) {
 	r.statusCode = statusCode
 	r.ResponseWriter.WriteHeader(statusCode)
-
 }
 
 // Header returns the response headers.

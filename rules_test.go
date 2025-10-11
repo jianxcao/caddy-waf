@@ -187,7 +187,7 @@ func TestLoadRules(t *testing.T) {
 			"action": "block"
 		}
 	]`
-	os.WriteFile(validRuleFile, []byte(validRules), 0644)
+	os.WriteFile(validRuleFile, []byte(validRules), 0o644)
 
 	invalidRuleFile := filepath.Join(tmpDir, "invalid_rules.json")
 	invalidRules := `[
@@ -199,7 +199,7 @@ func TestLoadRules(t *testing.T) {
 			"score": -1
 		}
 	]`
-	os.WriteFile(invalidRuleFile, []byte(invalidRules), 0644)
+	os.WriteFile(invalidRuleFile, []byte(invalidRules), 0o644)
 
 	tests := []struct {
 		name    string

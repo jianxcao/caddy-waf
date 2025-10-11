@@ -5,14 +5,17 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
-type ContextKeyLogId string
-type ContextKeyRule string
+type (
+	ContextKeyLogId string
+	ContextKeyRule  string
+)
 
 // ServeHTTP implements caddyhttp.Handler.
 // handler.go
@@ -154,7 +157,6 @@ func (m *Middleware) handleResponseBodyPhase(recorder *responseRecorder, r *http
 			if m.processRuleMatch(recorder, r, &rule, body, state) {
 				return
 			}
-
 		}
 	}
 }
@@ -274,7 +276,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 	}
 
 	if phase == 1 {
-		m.logger.Debug("Checking for IP blacklisting", zap.String("remote_addr", r.RemoteAddr)) //Added log for checking before to isIPBlacklisted call
+		m.logger.Debug("Checking for IP blacklisting", zap.String("remote_addr", r.RemoteAddr)) // Added log for checking before to isIPBlacklisted call
 		xForwardedFor := r.Header.Get("X-Forwarded-For")
 		if xForwardedFor != "" {
 			ips := strings.Split(xForwardedFor, ",")
@@ -293,7 +295,6 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 				}
 			} else {
 				m.logger.Debug("X-Forwarded-For header present but empty or invalid")
-
 			}
 
 		} else {

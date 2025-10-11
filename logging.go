@@ -105,7 +105,6 @@ func (m *Middleware) logRequest(level zapcore.Level, msg string, r *http.Request
 		)
 		m.logger.Log(level, msg, allFields...)
 	}
-
 }
 
 // redactSensitiveFields redacts sensitive information in the log fields.
