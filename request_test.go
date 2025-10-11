@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -196,12 +198,12 @@ func TestExtractValue_RemoteIP(t *testing.T) {
 	rve := NewRequestValueExtractor(logger, false)
 
 	req := httptest.NewRequest("GET", "/", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 
 	value, err := rve.ExtractValue("REMOTE_IP", req, w)
 	assert.NoError(t, err)
-	assert.Equal(t, "192.168.1.1:12345", value)
+	assert.Equal(t, localIP, value)
 }
 
 func TestExtractValue_Protocol(t *testing.T) {
@@ -442,7 +444,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           NewCIDRTrie(),
+		ipBlacklist:           trie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 		rateLimiter: func() *RateLimiter {
@@ -465,16 +467,16 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 	}
 
 	// Add some IPs to the blacklist
-	middleware.ipBlacklist.Insert("192.168.1.0/24")
+	middleware.ipBlacklist.Insert(netip.MustParsePrefix("192.168.1.0/24"), nil)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			req := httptest.NewRequest("GET", "http://example.com", nil)
-			req.RemoteAddr = fmt.Sprintf("192.168.1.%d:12345", i%256) // Simulate different IPs
-			req.Header.Set("User-Agent", "test-agent")                // Add a header for rule evaluation
+			req.RemoteAddr = fmt.Sprintf("192.168.1.%d", i%256) // Simulate different IPs
+			req.Header.Set("User-Agent", "test-agent")          // Add a header for rule evaluation
 			w := httptest.NewRecorder()
 			state := &WAFState{}
 			middleware.handlePhase(w, req, 1, state)

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -397,13 +398,13 @@ func TestBlockedRequestPhase1_RateLimiting(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  NewCIDRTrie(),             // Initialize ipBlacklist
+		ipBlacklist:  trie.NewTrie(),            // Initialize ipBlacklist
 		dnsBlacklist: make(map[string]struct{}), // Initialize dnsBlacklist
 	}
 
 	// Simulate two requests from the same IP
 	req := httptest.NewRequest("GET", "http://example.com/api/test", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req.RemoteAddr = localIP
 	w1 := httptest.NewRecorder()
 	w2 := httptest.NewRecorder()
 	state1 := &WAFState{}

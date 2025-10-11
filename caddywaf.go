@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/oschwald/maxminddb-golang"
+	trie "github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -235,8 +237,8 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 
 	// Load IP blacklist
 	if m.IPBlacklistFile != "" {
-		m.ipBlacklist = NewCIDRTrie()
-		err = m.loadIPBlacklist(m.IPBlacklistFile, m.ipBlacklist)
+		m.ipBlacklist = trie.NewTrie()
+		err = m.loadIPBlacklist(m.IPBlacklistFile, *m.ipBlacklist)
 		if err != nil {
 			return fmt.Errorf("failed to load IP blacklist: %w", err)
 		}
@@ -424,8 +426,8 @@ func (m *Middleware) ReloadConfig() error {
 
 	m.logger.Info("Reloading WAF configuration")
 	if m.IPBlacklistFile != "" {
-		newIPBlacklist := NewCIDRTrie()
-		if err := m.loadIPBlacklist(m.IPBlacklistFile, newIPBlacklist); err != nil {
+		newIPBlacklist := trie.NewTrie()
+		if err := m.loadIPBlacklist(m.IPBlacklistFile, *newIPBlacklist); err != nil {
 			m.logger.Error("Failed to reload IP blacklist", zap.String("file", m.IPBlacklistFile), zap.Error(err))
 			return fmt.Errorf("failed to reload IP blacklist: %v", err)
 		}
@@ -450,7 +452,7 @@ func (m *Middleware) ReloadConfig() error {
 	return nil
 }
 
-func (m *Middleware) loadIPBlacklist(path string, blacklistMap *CIDRTrie) error {
+func (m *Middleware) loadIPBlacklist(path string, blacklistMap trie.Trie) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		m.logger.Warn("Skipping IP blacklist load, file does not exist", zap.String("file", path))
 		return nil
@@ -464,7 +466,7 @@ func (m *Middleware) loadIPBlacklist(path string, blacklistMap *CIDRTrie) error 
 
 	// Convert the map to CIDRTrie
 	for ip := range blacklist {
-		blacklistMap.Insert(ip)
+		blacklistMap.Insert(netip.MustParsePrefix(ip), nil)
 	}
 	return nil
 }

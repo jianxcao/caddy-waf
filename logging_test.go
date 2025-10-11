@@ -25,7 +25,7 @@ func TestLogRequest(t *testing.T) {
 
 	// Create a test request
 	req := httptest.NewRequest("GET", "/test?foo=bar", nil)
-	req.RemoteAddr = "192.168.1.1:12345"
+	req.RemoteAddr = localIP
 	req.Header.Set("User-Agent", "test-agent")
 
 	// Log a test message

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"strings"
 
@@ -64,10 +65,7 @@ func (bl *BlacklistLoader) LoadDNSBlacklistFromFile(path string, dnsBlacklist ma
 }
 
 func (m *Middleware) isIPBlacklisted(ip string) bool {
-	if m.ipBlacklist == nil { // Defensive check: ensure ipBlacklist is not nil
-		return false
-	}
-	if m.ipBlacklist.Contains(ip) {
+	if m.ipBlacklist.Contains(netip.MustParseAddr(ip)) {
 		m.muIPBlacklistMetrics.Lock()                            // Acquire lock before accessing shared counter
 		m.IPBlacklistBlockCount++                                // Increment the counter
 		m.muIPBlacklistMetrics.Unlock()                          // Release lock after accessing counter
@@ -127,7 +125,6 @@ func extractIP(remoteAddr string, logger *zap.Logger) string {
 	return host
 }
 
-// LoadIPBlacklistFromFile loads IP addresses from a file into the provided map.
 // LoadIPBlacklistFromFile loads IP addresses from a file into the provided map.
 func (bl *BlacklistLoader) LoadIPBlacklistFromFile(path string, ipBlacklist map[string]struct{}) error {
 	bl.logger.Debug("Loading IP blacklist", zap.String("path", path))
