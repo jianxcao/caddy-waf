@@ -25,16 +25,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/caddyserver/caddy/v2"
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
-	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/fsnotify/fsnotify"
 	"github.com/oschwald/maxminddb-golang"
 	trie "github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 // ==================== Constants and Globals ====================
@@ -120,7 +120,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	fileCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 	fileEncoder := zapcore.NewJSONEncoder(fileCfg.EncoderConfig)
 
-	fileSync, err := os.OpenFile(m.LogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fileSync, err := os.OpenFile(m.LogFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		m.logger.Warn("Failed to open log file, logging only to console", zap.String("path", m.LogFilePath), zap.Error(err))
 		m.logger = zap.New(zapcore.NewCore(consoleEncoder, consoleSync, logLevel))

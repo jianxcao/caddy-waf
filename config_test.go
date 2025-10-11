@@ -2,15 +2,14 @@
 package caddywaf
 
 import (
-	"path/filepath"
-
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
-
 	"go.uber.org/zap"
+
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 )
 
 func TestNewConfigLoader(t *testing.T) {

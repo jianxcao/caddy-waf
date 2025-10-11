@@ -12,10 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	trie "github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
@@ -496,6 +497,7 @@ func TestBlockedRequestPhase1_HeaderRegex_EmptyHeader(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
 	assert.Empty(t, w.Body.String(), "Response body should be empty")
 }
+
 func TestBlockedRequestPhase1_HeaderRegex_MissingHeader(t *testing.T) {
 	logger := zap.NewNop()
 	middleware := &Middleware{
@@ -546,7 +548,6 @@ func TestBlockedRequestPhase1_HeaderRegex_MissingHeader(t *testing.T) {
 	assert.False(t, state.Blocked, "Request should not be blocked because header is missing")
 	assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
 	assert.Empty(t, w.Body.String(), "Response body should be empty")
-
 }
 
 func TestBlockedRequestPhase1_HeaderRegex_ComplexPattern(t *testing.T) {

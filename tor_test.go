@@ -6,9 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/caddyserver/caddy/v2"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
+
+	"github.com/caddyserver/caddy/v2"
 )
 
 func TestTorConfig_Provision(t *testing.T) {

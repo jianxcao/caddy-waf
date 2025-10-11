@@ -15,14 +15,16 @@
 //   - Dynamic configuration reloading
 //
 // Installation:
-//   xcaddy build --with github.com/fabriziosalmi/caddy-waf
+//
+//	xcaddy build --with github.com/fabriziosalmi/caddy-waf
 //
 // Basic usage in Caddyfile:
-//   waf {
-//       rule_file rules.json
-//       ip_blacklist_file blacklist.txt
-//       metrics_endpoint /waf_metrics
-//   }
+//
+//	waf {
+//	    rule_file rules.json
+//	    ip_blacklist_file blacklist.txt
+//	    metrics_endpoint /waf_metrics
+//	}
 //
 // For complete documentation, see: https://github.com/fabriziosalmi/caddy-waf
 package caddywaf

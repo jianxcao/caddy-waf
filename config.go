@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"go.uber.org/zap"
+
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 )
 
 // ConfigLoader structure to encapsulate loading and parsing logic
