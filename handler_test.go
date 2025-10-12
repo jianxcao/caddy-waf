@@ -66,31 +66,44 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	geoIPBlock, err := geoIPHandler.LoadGeoIPDatabase(geoIPdata)
 	assert.NoError(t, err)
 
+	state := &WAFState{}
+
 	middleware := &Middleware{
 		logger:       logger,
+		ipBlacklist:  iptrie.NewTrie(),
 		geoIPHandler: geoIPHandler,
 		CountryBlock: CountryAccessFilter{
 			Enabled:     true,
-			CountryList: []string{"US"},
+			CountryList: []string{"US", "RU"},
 			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
 			geoIP:       geoIPBlock,
 		},
 		CustomResponses: customResponse,
 	}
 
-	// Simulate a request from a blocked country (US)
-	req := httptest.NewRequest("GET", testURL, nil)
-	req.RemoteAddr = googleUSIP
 	w := httptest.NewRecorder()
-	state := &WAFState{}
 
-	// Process the request in Phase 1
-	middleware.handlePhase(w, req, 1, state)
+	t.Run("Allow unblocked CN by GeoIP", func(t *testing.T) {
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = aliCNIP
 
-	// Verify that the request was blocked
-	assert.True(t, state.Blocked, "Request should be blocked")
-	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+	})
+
+	t.Run("Block US IP by GeoIP", func(t *testing.T) {
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = googleUSIP
+
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
 }
 
 func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
@@ -133,11 +146,11 @@ func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 			CustomResponses: customResponse,
 		}
 
-		req0 := httptest.NewRequest("GET", testURL, nil)
-		req0.RemoteAddr = "192.168.1.1"
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = "192.168.1.1"
 
 		// Process the request in Phase 1
-		middleware.handlePhase(w, req0, 1, state)
+		middleware.handlePhase(w, req, 1, state)
 
 		// Verify that the request was blocked
 		assert.True(t, state.Blocked, "Request should be blocked")
