@@ -230,11 +230,11 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 		zap.String("user_agent", r.UserAgent()),
 	)
 
-	if phase == 1 && m.CountryBlock.Enabled {
+	if phase == 1 && m.CountryBlacklist.Enabled {
 		m.logger.Debug("Starting country blacklisting phase")
-		blocked, err := m.isCountryInList(r.RemoteAddr, m.CountryBlock.CountryList, m.CountryBlock.geoIP)
+		blocked, err := m.isCountryInList(r.RemoteAddr, m.CountryBlacklist.CountryList, m.CountryBlacklist.geoIP)
 		if err != nil {
-			m.logRequest(zapcore.ErrorLevel, "Failed to check country block",
+			m.logRequest(zapcore.ErrorLevel, "Failed to check country blacklisting",
 				r,
 				zap.Error(err),
 			)

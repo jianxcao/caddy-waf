@@ -104,7 +104,7 @@ type Middleware struct {
 	IPBlacklistFile  string              `json:"ip_blacklist_file"`
 	DNSBlacklistFile string              `json:"dns_blacklist_file"`
 	AnomalyThreshold int                 `json:"anomaly_threshold"`
-	CountryBlock     CountryAccessFilter `json:"country_block"`
+	CountryBlacklist CountryAccessFilter `json:"country_blacklist"`
 	CountryWhitelist CountryAccessFilter `json:"country_whitelist"`
 	Rules            map[int][]Rule      `json:"-"`
 	ipBlacklist      *iptrie.Trie        `json:"-"`

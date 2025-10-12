@@ -71,7 +71,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		logger:       logger,
 		ipBlacklist:  iptrie.NewTrie(),
 		geoIPHandler: geoIPHandler,
-		CountryBlock: CountryAccessFilter{
+		CountryBlacklist: CountryAccessFilter{
 			Enabled:     true,
 			CountryList: []string{"US", "RU"},
 			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database

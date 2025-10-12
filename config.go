@@ -140,7 +140,7 @@ func (cl *ConfigLoader) UnmarshalCaddyfile(d *caddyfile.Dispenser, m *Middleware
 	m.LogSeverity = "info"
 	m.LogJSON = false
 	m.AnomalyThreshold = 5
-	m.CountryBlock.Enabled = false
+	m.CountryBlacklist.Enabled = false
 	m.CountryWhitelist.Enabled = false
 	m.LogFilePath = "debug.json"
 	m.RedactSensitiveData = false
@@ -269,7 +269,7 @@ func (cl *ConfigLoader) parseCustomResponse(d *caddyfile.Dispenser, m *Middlewar
 // parseCountryBlockDirective returns a closure to handle block_countries and whitelist_countries directives.
 func (cl *ConfigLoader) parseCountryBlockDirective(isBlock bool) func(d *caddyfile.Dispenser, m *Middleware) error {
 	return func(d *caddyfile.Dispenser, m *Middleware) error {
-		target := &m.CountryBlock
+		target := &m.CountryBlacklist
 		directiveName := "block_countries"
 		if !isBlock {
 			target = &m.CountryWhitelist
