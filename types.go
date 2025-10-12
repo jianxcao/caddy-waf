@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/oschwald/maxminddb-golang"
-	trie "github.com/phemmer/go-iptrie"
+	"github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -104,10 +104,10 @@ type Middleware struct {
 	IPBlacklistFile  string              `json:"ip_blacklist_file"`
 	DNSBlacklistFile string              `json:"dns_blacklist_file"`
 	AnomalyThreshold int                 `json:"anomaly_threshold"`
-	CountryBlock     CountryAccessFilter `json:"country_block"`
+	CountryBlacklist CountryAccessFilter `json:"country_blacklist"`
 	CountryWhitelist CountryAccessFilter `json:"country_whitelist"`
 	Rules            map[int][]Rule      `json:"-"`
-	ipBlacklist      *trie.Trie          `json:"-"`
+	ipBlacklist      *iptrie.Trie        `json:"-"`
 	dnsBlacklist     map[string]struct{} `json:"-"` // Changed to map[string]struct{}
 	logger           *zap.Logger
 	LogSeverity      string `json:"log_severity,omitempty"`

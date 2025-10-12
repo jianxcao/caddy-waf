@@ -27,7 +27,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/oschwald/maxminddb-golang"
-	trie "github.com/phemmer/go-iptrie"
+	"github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -193,23 +193,23 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	// Initialize GeoIP stats
 	m.geoIPStats = make(map[string]int64)
 
-	// Configure GeoIP-based country blocking/whitelisting
-	if m.CountryBlock.Enabled || m.CountryWhitelist.Enabled {
-		geoIPPath := m.CountryBlock.GeoIPDBPath
+	// Configure GeoIP-based country blacklisting/whitelisting
+	if m.CountryBlacklist.Enabled || m.CountryWhitelist.Enabled {
+		geoIPPath := m.CountryBlacklist.GeoIPDBPath
 		if m.CountryWhitelist.Enabled && m.CountryWhitelist.GeoIPDBPath != "" {
 			geoIPPath = m.CountryWhitelist.GeoIPDBPath
 		}
 
 		if !fileExists(geoIPPath) {
-			m.logger.Warn("GeoIP database not found. Country blocking/whitelisting will be disabled", zap.String("path", geoIPPath))
+			m.logger.Warn("GeoIP database not found. Country blacklisting/whitelisting will be disabled", zap.String("path", geoIPPath))
 		} else {
 			reader, err := maxminddb.Open(geoIPPath)
 			if err != nil {
 				m.logger.Error("Failed to load GeoIP database", zap.String("path", geoIPPath), zap.Error(err))
 			} else {
 				m.logger.Info("GeoIP database loaded successfully", zap.String("path", geoIPPath))
-				if m.CountryBlock.Enabled {
-					m.CountryBlock.geoIP = reader
+				if m.CountryBlacklist.Enabled {
+					m.CountryBlacklist.geoIP = reader
 				}
 				if m.CountryWhitelist.Enabled {
 					m.CountryWhitelist.geoIP = reader
@@ -237,7 +237,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 
 	// Load IP blacklist
 	if m.IPBlacklistFile != "" {
-		m.ipBlacklist = trie.NewTrie()
+		m.ipBlacklist = iptrie.NewTrie()
 		err = m.loadIPBlacklist(m.IPBlacklistFile, *m.ipBlacklist)
 		if err != nil {
 			return fmt.Errorf("failed to load IP blacklist: %w", err)
@@ -288,20 +288,20 @@ func (m *Middleware) Shutdown(ctx context.Context) error {
 	var errorOccurred bool
 
 	// Close GeoIP databases
-	if m.CountryBlock.geoIP != nil {
-		m.logger.Debug("Closing country block GeoIP database...")
-		if err := m.CountryBlock.geoIP.Close(); err != nil {
-			m.logger.Error("Error encountered while closing country block GeoIP database", zap.Error(err))
+	if m.CountryBlacklist.geoIP != nil {
+		m.logger.Debug("Closing country blacklist GeoIP database...")
+		if err := m.CountryBlacklist.geoIP.Close(); err != nil {
+			m.logger.Error("Error encountered while closing country blacklist GeoIP database", zap.Error(err))
 			if !errorOccurred {
-				firstError = fmt.Errorf("error closing country block GeoIP: %w", err)
+				firstError = fmt.Errorf("error closing country blacklist GeoIP: %w", err)
 				errorOccurred = true
 			}
 		} else {
-			m.logger.Debug("Country block GeoIP database closed successfully.")
+			m.logger.Debug("Country blacklist GeoIP database closed successfully.")
 		}
-		m.CountryBlock.geoIP = nil
+		m.CountryBlacklist.geoIP = nil
 	} else {
-		m.logger.Debug("Country block GeoIP database was not open, skipping close.")
+		m.logger.Debug("Country blacklist GeoIP database was not open, skipping close.")
 	}
 
 	if m.CountryWhitelist.geoIP != nil {
@@ -426,7 +426,7 @@ func (m *Middleware) ReloadConfig() error {
 
 	m.logger.Info("Reloading WAF configuration")
 	if m.IPBlacklistFile != "" {
-		newIPBlacklist := trie.NewTrie()
+		newIPBlacklist := iptrie.NewTrie()
 		if err := m.loadIPBlacklist(m.IPBlacklistFile, *newIPBlacklist); err != nil {
 			m.logger.Error("Failed to reload IP blacklist", zap.String("file", m.IPBlacklistFile), zap.Error(err))
 			return fmt.Errorf("failed to reload IP blacklist: %v", err)
@@ -452,7 +452,7 @@ func (m *Middleware) ReloadConfig() error {
 	return nil
 }
 
-func (m *Middleware) loadIPBlacklist(path string, blacklistMap trie.Trie) error {
+func (m *Middleware) loadIPBlacklist(path string, blacklistMap iptrie.Trie) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		m.logger.Warn("Skipping IP blacklist load, file does not exist", zap.String("file", path))
 		return nil

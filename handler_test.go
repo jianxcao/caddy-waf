@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	trie "github.com/phemmer/go-iptrie"
+	"github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 
@@ -26,32 +26,37 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 		dnsBlacklist: map[string]struct{}{
 			"malicious.domain": {},
 		},
-		ipBlacklist: trie.NewTrie(),
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		ipBlacklist:     iptrie.NewTrie(),
+		CustomResponses: customResponse,
 	}
 
-	// Simulate a request to a blacklisted domain
-	req := httptest.NewRequest("GET", "http://malicious.domain", nil)
-	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
-	// Process the request in Phase 1
-	middleware.handlePhase(w, req, 1, state)
+	t.Run("Allow unblocked domain", func(t *testing.T) {
+		// Simulate a request to a blacklisted domain
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = localIP
 
-	// Debug: Print the response body and status code
-	t.Logf("Response Body: %s", w.Body.String())
-	t.Logf("Response Status Code: %d", w.Code)
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
+	})
 
-	// Verify that the request was blocked
-	assert.True(t, state.Blocked, "Request should be blocked")
-	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	t.Run("Block blacklisted domain", func(t *testing.T) {
+		// Simulate a request to a blacklisted domain
+		req := httptest.NewRequest("GET", "http://malicious.domain", nil)
+		req.RemoteAddr = localIP
+
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
 }
 
 func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
@@ -62,68 +67,135 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	geoIPBlock, err := geoIPHandler.LoadGeoIPDatabase(geoIPdata)
 	assert.NoError(t, err)
 
-	middleware := &Middleware{
+	blackListMiddleware := &Middleware{
 		logger:       logger,
+		ipBlacklist:  iptrie.NewTrie(),
 		geoIPHandler: geoIPHandler,
-		CountryBlock: CountryAccessFilter{
+		CountryBlacklist: CountryAccessFilter{
 			Enabled:     true,
-			CountryList: []string{"US"},
+			CountryList: []string{"US", "RU"},
 			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
 			geoIP:       geoIPBlock,
 		},
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		CustomResponses: customResponse,
 	}
 
-	// Simulate a request from a blocked country (US)
-	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = googleUSIP
-	w := httptest.NewRecorder()
+	whiteListMiddleware := &Middleware{
+		logger:       logger,
+		ipBlacklist:  iptrie.NewTrie(),
+		geoIPHandler: geoIPHandler,
+		CountryWhitelist: CountryAccessFilter{
+			Enabled:     true,
+			CountryList: []string{"BR"},
+			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
+			geoIP:       geoIPBlock,
+		},
+		CustomResponses: customResponse,
+	}
+
+	req := httptest.NewRequest("GET", testURL, nil)
+
 	state := &WAFState{}
 
-	// Process the request in Phase 1
-	middleware.handlePhase(w, req, 1, state)
+	t.Run("GeoIP Blacklist: Allow CN IP", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req.RemoteAddr = aliCNIP
 
-	// Verify that the request was blocked
-	assert.True(t, state.Blocked, "Request should be blocked")
-	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+		// Process the request in Phase 1
+		blackListMiddleware.handlePhase(w, req, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
+	})
+
+	t.Run("GeoIP Blacklist: Block US IP", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req.RemoteAddr = googleUSIP
+
+		// Process the request in Phase 1
+		blackListMiddleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
+
+	t.Run("GeoIP Whitelist: Allow BR IP", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req.RemoteAddr = googleBRIP
+
+		// Process the request in Phase 1
+		whiteListMiddleware.handlePhase(w, req, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
+	})
+
+	t.Run("GeoIP Whitelist: Block RU IP", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req.RemoteAddr = googleRUIP
+
+		// Process the request in Phase 1
+		whiteListMiddleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
 }
 
 func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	assert.NoError(t, err)
 
-	ipBlackList := trie.NewTrie()
-	ipBlackList.Insert(netip.MustParsePrefix("127.0.0.1/24"), nil)
+	blackList := iptrie.NewTrie()
+	loader := iptrie.NewTrieLoader(blackList)
 
-	middleware := &Middleware{
-		logger:      logger,
-		ipBlacklist: ipBlackList,
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+	for _, net := range []string{
+		"192.168.0.0/24",
+		"192.168.1.1/32",
+	} {
+		loader.Insert(netip.MustParsePrefix(net), "net="+net)
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
-	req.RemoteAddr = localIP
-	w := httptest.NewRecorder()
 	state := &WAFState{}
+	w := httptest.NewRecorder()
 
-	// Process the request in Phase 1
-	middleware.handlePhase(w, req, 1, state)
+	t.Run("Allow unblocked CIDR", func(t *testing.T) {
+		middleware := &Middleware{
+			logger:          logger,
+			ipBlacklist:     blackList,
+			CustomResponses: customResponse,
+		}
 
-	// Verify that the request was blocked
-	assert.True(t, state.Blocked, "Request should be blocked")
-	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = localIP
+
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+
+		assert.False(t, state.Blocked, "Request should be allowed")
+		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
+	})
+
+	t.Run("Blocks blacklisted CIDR", func(t *testing.T) {
+		middleware := &Middleware{
+			logger:          logger,
+			ipBlacklist:     blackList,
+			CustomResponses: customResponse,
+		}
+
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = "192.168.1.1"
+
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
 }
 
 func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
@@ -144,18 +216,13 @@ func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		CustomResponses:       customResponse,
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.Header.Set("User-Agent", "nikto")
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
@@ -204,12 +271,12 @@ func TestBlockedRequestPhase1_HeaderRegex(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "this-is-a-bad-header") // Simulate a request with bad header
 
@@ -257,12 +324,12 @@ func TestBlockedRequestPhase1_HeaderRegex_SpecificValue(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Specific-Header", "specific-value") // Simulate a request with the specific header
 
@@ -310,12 +377,12 @@ func TestBlockedRequestPhase1_HeaderRegex_CommaSeparatedTargets(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header1", "good-value")
 	req.Header.Set("X-Custom-Header2", "bad-value") // Simulate a request with bad value in one of the headers
@@ -364,7 +431,7 @@ func TestBlockedRequestPhase1_CombinedConditions(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -417,12 +484,12 @@ func TestBlockedRequestPhase1_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("User-Agent", "good-user")
 
@@ -470,12 +537,12 @@ func TestBlockedRequestPhase1_HeaderRegex_EmptyHeader(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 
 	// Create a context and add logID to it
@@ -522,12 +589,12 @@ func TestBlockedRequestPhase1_HeaderRegex_MissingHeader(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil) // Header not set
+	req := httptest.NewRequest("GET", testURL, nil) // Header not set
 	req.RemoteAddr = localIP
 
 	// Create a context and add logID to it
@@ -574,12 +641,12 @@ func TestBlockedRequestPhase1_HeaderRegex_ComplexPattern(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Email-Header", "test@example.com") // Simulate a request with a valid email
 
@@ -627,12 +694,12 @@ func TestBlockedRequestPhase1_MultiTargetMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "good-header")
 	req.Header.Set("User-Agent", "bad-user-agent")
@@ -680,12 +747,12 @@ func TestBlockedRequestPhase1_MultiTargetNoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "good-header")
 	req.Header.Set("User-Agent", "good-user-agent")
@@ -734,7 +801,7 @@ func TestBlockedRequestPhase1_URLParameterRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -794,7 +861,7 @@ func TestBlockedRequestPhase1_MultipleRules(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -870,12 +937,12 @@ func TestBlockedRequestPhase2_BodyRegex(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com",
+	req := httptest.NewRequest("POST", testURL,
 		func() *bytes.Buffer {
 			b := new(bytes.Buffer)
 			b.WriteString("this-is-a-bad-body")
@@ -929,12 +996,12 @@ func TestBlockedRequestPhase2_BodyRegex_JSON(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com",
+	req := httptest.NewRequest("POST", testURL,
 		func() *bytes.Buffer {
 			b := new(bytes.Buffer)
 			b.WriteString(`{"data":{"malicious":true,"name":"test"}}`)
@@ -988,12 +1055,12 @@ func TestBlockedRequestPhase2_BodyRegex_FormURLEncoded(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com",
+	req := httptest.NewRequest("POST", testURL,
 		strings.NewReader("param1=value1&secret=badvalue¶m2=value2"),
 	)
 	req.RemoteAddr = localIP
@@ -1043,12 +1110,12 @@ func TestBlockedRequestPhase2_BodyRegex_SpecificPattern(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com",
+	req := httptest.NewRequest("POST", testURL,
 		func() *bytes.Buffer {
 			b := new(bytes.Buffer)
 			b.WriteString("User ID: 123-45-6789")
@@ -1102,12 +1169,12 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com",
+	req := httptest.NewRequest("POST", testURL,
 		func() *bytes.Buffer {
 			b := new(bytes.Buffer)
 			b.WriteString("this-is-a-good-body")
@@ -1161,7 +1228,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch_MultipartForm(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1181,7 +1248,7 @@ func TestBlockedRequestPhase2_BodyRegex_NoMatch_MultipartForm(t *testing.T) {
 		t.Fatalf("Failed to close multipart writer: %v", err)
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com", body)
+	req := httptest.NewRequest("POST", testURL, body)
 	req.RemoteAddr = localIP
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
@@ -1229,12 +1296,12 @@ func TestBlockedRequestPhase2_BodyRegex_NoBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("POST", "http://example.com", nil)
+	req := httptest.NewRequest("POST", testURL, nil)
 	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
@@ -1275,7 +1342,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoMatch(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1288,7 +1355,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoMatch(t *testing.T) {
 		})
 	}()
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
@@ -1331,7 +1398,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_EmptyBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1343,7 +1410,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_EmptyBody(t *testing.T) {
 		})
 	}()
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
@@ -1387,7 +1454,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_NoBody(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1399,7 +1466,7 @@ func TestBlockedRequestPhase4_ResponseBodyRegex_NoBody(t *testing.T) {
 		})
 	}()
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
@@ -1441,7 +1508,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoSetCookie(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
@@ -1453,7 +1520,7 @@ func TestBlockedRequestPhase3_ResponseHeaderRegex_NoSetCookie(t *testing.T) {
 		})
 	}()
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
@@ -1497,12 +1564,12 @@ func TestBlockedRequestPhase1_HeaderRegex_CaseInsensitive(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header", "bAd-VaLuE") // Test with mixed-case header value
 
@@ -1550,12 +1617,12 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 	req.RemoteAddr = localIP
 	req.Header.Set("X-Custom-Header1", "bad-value")
 	req.Header.Set("X-Custom-Header2", "bad-value") // Both headers have a "bad" value
@@ -1579,7 +1646,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
 	assert.Contains(t, w.Body.String(), "Blocked by Multiple Matching Headers Regex", "Response body should contain 'Blocked by Multiple Matching Headers Regex'")
 
-	req2 := httptest.NewRequest("GET", "http://example.com", nil)
+	req2 := httptest.NewRequest("GET", testURL, nil)
 	req2.RemoteAddr = localIP
 	req2.Header.Set("X-Custom-Header1", "good-value")
 	req2.Header.Set("X-Custom-Header2", "bad-value") // One header has a "bad" value
@@ -1603,7 +1670,7 @@ func TestBlockedRequestPhase1_HeaderRegex_MultipleMatchingHeaders(t *testing.T) 
 	assert.Equal(t, http.StatusForbidden, w2.Code, "Expected status code 403")
 	assert.Contains(t, w2.Body.String(), "Blocked by Multiple Matching Headers Regex", "Response body should contain 'Blocked by Multiple Matching Headers Regex'")
 
-	req3 := httptest.NewRequest("GET", "http://example.com", nil)
+	req3 := httptest.NewRequest("GET", testURL, nil)
 	req3.RemoteAddr = localIP
 	req3.Header.Set("X-Custom-Header1", "good-value")
 	req3.Header.Set("X-Custom-Header2", "good-value") // None headers have a "bad" value
@@ -1658,7 +1725,7 @@ func TestBlockedRequestPhase1_RateLimiting_MultiplePaths(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  trie.NewTrie(),
+		ipBlacklist:  iptrie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 
@@ -1728,7 +1795,7 @@ func TestBlockedRequestPhase1_RateLimiting_DifferentIPs(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  trie.NewTrie(),
+		ipBlacklist:  iptrie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 
@@ -1781,7 +1848,7 @@ func TestBlockedRequestPhase1_RateLimiting_MatchAllPaths(t *testing.T) {
 				Body:       "Rate limit exceeded",
 			},
 		},
-		ipBlacklist:  trie.NewTrie(),
+		ipBlacklist:  iptrie.NewTrie(),
 		dnsBlacklist: make(map[string]struct{}),
 	}
 

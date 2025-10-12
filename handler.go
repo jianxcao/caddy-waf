@@ -230,18 +230,18 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 		zap.String("user_agent", r.UserAgent()),
 	)
 
-	if phase == 1 && m.CountryBlock.Enabled {
-		m.logger.Debug("Starting country blocking phase")
-		blocked, err := m.isCountryInList(r.RemoteAddr, m.CountryBlock.CountryList, m.CountryBlock.geoIP)
+	if phase == 1 && m.CountryBlacklist.Enabled {
+		m.logger.Debug("Starting country blacklisting phase")
+		blocked, err := m.isCountryInList(r.RemoteAddr, m.CountryBlacklist.CountryList, m.CountryBlacklist.geoIP)
 		if err != nil {
-			m.logRequest(zapcore.ErrorLevel, "Failed to check country block",
+			m.logRequest(zapcore.ErrorLevel, "Failed to check country blacklisting",
 				r,
 				zap.Error(err),
 			)
 			m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule", r.RemoteAddr,
 				zap.String("message", "Request blocked due to internal error"),
 			)
-			m.logger.Debug("Country blocking phase completed - blocked due to error")
+			m.logger.Debug("Country blacklisting phase completed - blocked due to error")
 			m.incrementGeoIPRequestsMetric(false) // Increment with false for error
 			return
 		} else if blocked {
@@ -254,7 +254,34 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			}
 			return
 		}
-		m.logger.Debug("Country blocking phase completed - not blocked")
+		m.logger.Debug("Country blacklisting phase completed - not blocked")
+		m.incrementGeoIPRequestsMetric(false) // Increment with false for no block
+	}
+
+	if phase == 1 && m.CountryWhitelist.Enabled {
+		m.logger.Debug("Starting country whitelisting phase")
+		allowed, err := m.isCountryInList(r.RemoteAddr, m.CountryWhitelist.CountryList, m.CountryWhitelist.geoIP)
+		if err != nil {
+			m.logRequest(zapcore.ErrorLevel, "Failed to check country whitelist",
+				r,
+				zap.Error(err),
+			)
+			m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule", r.RemoteAddr,
+				zap.String("message", "Request blocked due to internal error"),
+			)
+			m.logger.Debug("Country whitelisting phase completed - blocked due to error")
+			m.incrementGeoIPRequestsMetric(false) // Increment with false for error
+			return
+		} else if !allowed {
+			m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule", r.RemoteAddr,
+				zap.String("message", "Request blocked by country"))
+			m.incrementGeoIPRequestsMetric(true) // Increment with true for blocked
+			if m.CustomResponses != nil {
+				m.writeCustomResponse(w, state.StatusCode)
+			}
+			return
+		}
+		m.logger.Debug("Country whitelisting phase completed - not blocked")
 		m.incrementGeoIPRequestsMetric(false) // Increment with false for no block
 	}
 
@@ -327,7 +354,8 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 	rules, ok := m.Rules[phase]
 	if !ok {
 		m.logger.Debug("No rules found for phase", zap.Int("phase", phase))
-		return
+		// Don't block on empty rules. There may be no rules specified
+		// return
 	}
 
 	m.logger.Debug("Starting rule evaluation for phase", zap.Int("phase", phase), zap.Int("rule_count", len(rules)))
@@ -434,6 +462,8 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 		zap.Int("total_score", state.TotalScore),
 		zap.Int("anomaly_threshold", m.AnomalyThreshold),
 	)
+
+	m.allowRequest(state)
 }
 
 // incrementRateLimiterBlockedRequestsMetric increments the blocked requests metric for the rate limiter.

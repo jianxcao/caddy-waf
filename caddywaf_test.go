@@ -32,7 +32,7 @@ func TestMiddleware_Provision(t *testing.T) {
 		IPBlacklistFile:  "testdata/ip_blacklist.txt",
 		DNSBlacklistFile: "testdata/dns_blacklist.txt",
 		AnomalyThreshold: 10,
-		CountryBlock: CountryAccessFilter{
+		CountryBlacklist: CountryAccessFilter{
 			Enabled:     true,
 			CountryList: []string{"US"},
 			GeoIPDBPath: "testdata/GeoIP2-Country-Test.mmdb",

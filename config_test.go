@@ -201,14 +201,14 @@ func TestParseCountryBlock(t *testing.T) {
 		t.Fatalf("parseCountryBlockDirective failed: %v", err)
 	}
 
-	if !m.CountryBlock.Enabled {
-		t.Errorf("Expected country block to be enabled, got %v", m.CountryBlock.Enabled)
+	if !m.CountryBlacklist.Enabled {
+		t.Errorf("Expected country blacklist to be enabled, got %v", m.CountryBlacklist.Enabled)
 	}
-	if m.CountryBlock.GeoIPDBPath != "/etc/geoip/GeoIP.dat" {
-		t.Errorf("Expected GeoIP DB path to be '/etc/geoip/GeoIP.dat', got '%s'", m.CountryBlock.GeoIPDBPath)
+	if m.CountryBlacklist.GeoIPDBPath != "/etc/geoip/GeoIP.dat" {
+		t.Errorf("Expected GeoIP DB path to be '/etc/geoip/GeoIP.dat', got '%s'", m.CountryBlacklist.GeoIPDBPath)
 	}
-	if len(m.CountryBlock.CountryList) != 2 || m.CountryBlock.CountryList[0] != "US" || m.CountryBlock.CountryList[1] != "CA" {
-		t.Errorf("Expected country list to be ['US', 'CA'], got %v", m.CountryBlock.CountryList)
+	if len(m.CountryBlacklist.CountryList) != 2 || m.CountryBlacklist.CountryList[0] != "US" || m.CountryBlacklist.CountryList[1] != "CA" {
+		t.Errorf("Expected country list to be ['US', 'CA'], got %v", m.CountryBlacklist.CountryList)
 	}
 }
 
