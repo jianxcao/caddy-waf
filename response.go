@@ -8,6 +8,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// allowRequest - handles request allowing
+func (m *Middleware) allowRequest(state *WAFState) {
+	state.Blocked = false
+	state.StatusCode = http.StatusOK
+	state.ResponseWritten = false
+
+	m.incrementAllowedRequestsMetric()
+}
+
 // blockRequest handles blocking a request and logging the details.
 func (m *Middleware) blockRequest(recorder http.ResponseWriter, r *http.Request, state *WAFState, statusCode int, reason, ruleID, matchedValue string, fields ...zap.Field) {
 	// CRITICAL FIX: Set these flags before any other operations
