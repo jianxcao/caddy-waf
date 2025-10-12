@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	trie "github.com/phemmer/go-iptrie"
+	"github.com/phemmer/go-iptrie"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -34,7 +34,7 @@ func TestExtractValue(t *testing.T) {
 			name:   "Extract METHOD",
 			target: "METHOD",
 			setupRequest: func() (*http.Request, http.ResponseWriter) {
-				req := httptest.NewRequest("POST", "http://example.com", nil)
+				req := httptest.NewRequest("POST", testURL, nil)
 				return req, httptest.NewRecorder()
 			},
 			expectedValue: "POST",
@@ -54,7 +54,7 @@ func TestExtractValue(t *testing.T) {
 			name:   "Extract USER_AGENT",
 			target: "USER_AGENT",
 			setupRequest: func() (*http.Request, http.ResponseWriter) {
-				req := httptest.NewRequest("GET", "http://example.com", nil)
+				req := httptest.NewRequest("GET", testURL, nil)
 				req.Header.Set("User-Agent", "test-agent")
 				return req, httptest.NewRecorder()
 			},
@@ -65,7 +65,7 @@ func TestExtractValue(t *testing.T) {
 			name:   "Extract HEADERS prefix",
 			target: "HEADERS:Content-Type",
 			setupRequest: func() (*http.Request, http.ResponseWriter) {
-				req := httptest.NewRequest("GET", "http://example.com", nil)
+				req := httptest.NewRequest("GET", testURL, nil)
 				req.Header.Set("Content-Type", "application/json")
 				return req, httptest.NewRecorder()
 			},
@@ -86,7 +86,7 @@ func TestExtractValue(t *testing.T) {
 			name:   "Empty target",
 			target: "",
 			setupRequest: func() (*http.Request, http.ResponseWriter) {
-				return httptest.NewRequest("GET", "http://example.com", nil), httptest.NewRecorder()
+				return httptest.NewRequest("GET", testURL, nil), httptest.NewRecorder()
 			},
 			expectedError: true,
 		},
@@ -383,7 +383,7 @@ func TestProcessRuleMatch_HighScore(t *testing.T) {
 		ResponseWritten: false,
 	}
 
-	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req := httptest.NewRequest("GET", testURL, nil)
 
 	// Create a context and add logID to it - FIX: ADD CONTEXT HERE
 	ctx := context.Background()
@@ -445,7 +445,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 			},
 		},
 		ruleCache:             NewRuleCache(),
-		ipBlacklist:           trie.NewTrie(),
+		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
 		rateLimiter: func() *RateLimiter {
@@ -475,7 +475,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			req := httptest.NewRequest("GET", "http://example.com", nil)
+			req := httptest.NewRequest("GET", testURL, nil)
 			req.RemoteAddr = fmt.Sprintf("192.168.1.%d", i%256) // Simulate different IPs
 			req.Header.Set("User-Agent", "test-agent")          // Add a header for rule evaluation
 			w := httptest.NewRecorder()

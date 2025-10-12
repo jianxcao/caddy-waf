@@ -27,7 +27,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/oschwald/maxminddb-golang"
-	trie "github.com/phemmer/go-iptrie"
+	"github.com/phemmer/go-iptrie"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -237,7 +237,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 
 	// Load IP blacklist
 	if m.IPBlacklistFile != "" {
-		m.ipBlacklist = trie.NewTrie()
+		m.ipBlacklist = iptrie.NewTrie()
 		err = m.loadIPBlacklist(m.IPBlacklistFile, *m.ipBlacklist)
 		if err != nil {
 			return fmt.Errorf("failed to load IP blacklist: %w", err)
@@ -426,7 +426,7 @@ func (m *Middleware) ReloadConfig() error {
 
 	m.logger.Info("Reloading WAF configuration")
 	if m.IPBlacklistFile != "" {
-		newIPBlacklist := trie.NewTrie()
+		newIPBlacklist := iptrie.NewTrie()
 		if err := m.loadIPBlacklist(m.IPBlacklistFile, *newIPBlacklist); err != nil {
 			m.logger.Error("Failed to reload IP blacklist", zap.String("file", m.IPBlacklistFile), zap.Error(err))
 			return fmt.Errorf("failed to reload IP blacklist: %v", err)
@@ -452,7 +452,7 @@ func (m *Middleware) ReloadConfig() error {
 	return nil
 }
 
-func (m *Middleware) loadIPBlacklist(path string, blacklistMap trie.Trie) error {
+func (m *Middleware) loadIPBlacklist(path string, blacklistMap iptrie.Trie) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		m.logger.Warn("Skipping IP blacklist load, file does not exist", zap.String("file", path))
 		return nil
