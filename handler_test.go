@@ -26,32 +26,36 @@ func TestBlockedRequestPhase1_DNSBlacklist(t *testing.T) {
 		dnsBlacklist: map[string]struct{}{
 			"malicious.domain": {},
 		},
-		ipBlacklist: iptrie.NewTrie(),
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		ipBlacklist:     iptrie.NewTrie(),
+		CustomResponses: customResponse,
 	}
 
-	// Simulate a request to a blacklisted domain
-	req := httptest.NewRequest("GET", "http://malicious.domain", nil)
-	req.RemoteAddr = localIP
 	w := httptest.NewRecorder()
 	state := &WAFState{}
 
-	// Process the request in Phase 1
-	middleware.handlePhase(w, req, 1, state)
+	t.Run("Allow unblocked domain", func(t *testing.T) {
+		// Simulate a request to a blacklisted domain
+		req := httptest.NewRequest("GET", testURL, nil)
+		req.RemoteAddr = localIP
 
-	// Debug: Print the response body and status code
-	t.Logf("Response Body: %s", w.Body.String())
-	t.Logf("Response Status Code: %d", w.Code)
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+	})
 
-	// Verify that the request was blocked
-	assert.True(t, state.Blocked, "Request should be blocked")
-	assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
-	assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	t.Run("Block blacklisted domain", func(t *testing.T) {
+		// Simulate a request to a blacklisted domain
+		req := httptest.NewRequest("GET", "http://malicious.domain", nil)
+		req.RemoteAddr = localIP
+
+		// Process the request in Phase 1
+		middleware.handlePhase(w, req, 1, state)
+
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
 }
 
 func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
@@ -71,12 +75,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
 			geoIP:       geoIPBlock,
 		},
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		CustomResponses: customResponse,
 	}
 
 	// Simulate a request from a blocked country (US)
@@ -111,18 +110,11 @@ func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 	state := &WAFState{}
 	w := httptest.NewRecorder()
 
-	resp := map[int]CustomBlockResponse{
-		403: {
-			StatusCode: http.StatusForbidden,
-			Body:       "Access Denied",
-		},
-	}
-
 	t.Run("Allow unblocked CIDR", func(t *testing.T) {
 		middleware := &Middleware{
 			logger:          logger,
 			ipBlacklist:     blackList,
-			CustomResponses: resp,
+			CustomResponses: customResponse,
 		}
 
 		req := httptest.NewRequest("GET", testURL, nil)
@@ -138,7 +130,7 @@ func TestBlockedRequestPhase1_IPBlocking(t *testing.T) {
 		middleware := &Middleware{
 			logger:          logger,
 			ipBlacklist:     blackList,
-			CustomResponses: resp,
+			CustomResponses: customResponse,
 		}
 
 		req0 := httptest.NewRequest("GET", testURL, nil)
@@ -175,12 +167,7 @@ func TestHandlePhase_Phase2_NiktoUserAgent(t *testing.T) {
 		ipBlacklist:           iptrie.NewTrie(),
 		dnsBlacklist:          map[string]struct{}{},
 		requestValueExtractor: NewRequestValueExtractor(logger, false),
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		CustomResponses:       customResponse,
 	}
 
 	req := httptest.NewRequest("GET", testURL, nil)

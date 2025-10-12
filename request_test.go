@@ -459,12 +459,7 @@ func TestConcurrentRuleEvaluation(t *testing.T) {
 			}
 			return rl
 		}(),
-		CustomResponses: map[int]CustomBlockResponse{
-			403: {
-				StatusCode: http.StatusForbidden,
-				Body:       "Access Denied",
-			},
-		},
+		CustomResponses: customResponse,
 	}
 
 	// Add some IPs to the blacklist

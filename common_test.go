@@ -1,9 +1,20 @@
 package caddywaf
 
+import "net/http"
+
 const (
 	geoIPdata  = "GeoLite2-Country.mmdb"
 	googleUSIP = "74.125.131.105"
 	localIP    = "127.0.0.1"
 	testURL    = "http://example.com"
 	torListURL = "https://cdn.nws.neurodyne.pro/nws-cdn-ut8hw561/waf/torbulkexitlist" // custom TOR list URL for testing
+)
+
+var (
+	customResponse = map[int]CustomBlockResponse{
+		403: {
+			StatusCode: http.StatusForbidden,
+			Body:       "Access Denied",
+		},
+	}
 )
