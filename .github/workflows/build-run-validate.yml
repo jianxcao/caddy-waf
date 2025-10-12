@@ -31,14 +31,6 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.24.2'
-
-      - name: Validate Go Installation
-        run: |
-          go version
-          if ! go version | grep -q "go1.24.2"; then
-            echo "Go installation failed or incorrect version"
-            exit 1
-          fi
             
       - name: Clone caddy-waf Repository
         run: |
