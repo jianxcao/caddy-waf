@@ -67,7 +67,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 	geoIPBlock, err := geoIPHandler.LoadGeoIPDatabase(geoIPdata)
 	assert.NoError(t, err)
 
-	blackListMiddleware := &Middleware{
+	blMiddleware := &Middleware{
 		logger:       logger,
 		ipBlacklist:  iptrie.NewTrie(),
 		geoIPHandler: geoIPHandler,
@@ -80,13 +80,32 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		CustomResponses: customResponse,
 	}
 
-	whiteListMiddleware := &Middleware{
+	wlMiddleware := &Middleware{
 		logger:       logger,
 		ipBlacklist:  iptrie.NewTrie(),
 		geoIPHandler: geoIPHandler,
 		CountryWhitelist: CountryAccessFilter{
 			Enabled:     true,
 			CountryList: []string{"BR"},
+			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
+			geoIP:       geoIPBlock,
+		},
+		CustomResponses: customResponse,
+	}
+
+	blackWhiteMw := &Middleware{
+		logger:       logger,
+		ipBlacklist:  iptrie.NewTrie(),
+		geoIPHandler: geoIPHandler,
+		CountryWhitelist: CountryAccessFilter{
+			Enabled:     true,
+			CountryList: []string{"BR"},
+			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
+			geoIP:       geoIPBlock,
+		},
+		CountryBlacklist: CountryAccessFilter{
+			Enabled:     true,
+			CountryList: []string{"US", "RU"},
 			GeoIPDBPath: geoIPdata, // Path to a test GeoIP database
 			geoIP:       geoIPBlock,
 		},
@@ -102,7 +121,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		req.RemoteAddr = aliCNIP
 
 		// Process the request in Phase 1
-		blackListMiddleware.handlePhase(w, req, 1, state)
+		blMiddleware.handlePhase(w, req, 1, state)
 		assert.False(t, state.Blocked, "Request should be allowed")
 		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
 	})
@@ -112,7 +131,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		req.RemoteAddr = googleUSIP
 
 		// Process the request in Phase 1
-		blackListMiddleware.handlePhase(w, req, 1, state)
+		blMiddleware.handlePhase(w, req, 1, state)
 
 		// Verify that the request was blocked
 		assert.True(t, state.Blocked, "Request should be blocked")
@@ -125,7 +144,7 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		req.RemoteAddr = googleBRIP
 
 		// Process the request in Phase 1
-		whiteListMiddleware.handlePhase(w, req, 1, state)
+		wlMiddleware.handlePhase(w, req, 1, state)
 		assert.False(t, state.Blocked, "Request should be allowed")
 		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
 	})
@@ -135,8 +154,31 @@ func TestBlockedRequestPhase1_GeoIPBlocking(t *testing.T) {
 		req.RemoteAddr = googleRUIP
 
 		// Process the request in Phase 1
-		whiteListMiddleware.handlePhase(w, req, 1, state)
+		wlMiddleware.handlePhase(w, req, 1, state)
 
+		// Verify that the request was blocked
+		assert.True(t, state.Blocked, "Request should be blocked")
+		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
+		assert.Contains(t, w.Body.String(), "Access Denied", "Response body should contain 'Access Denied'")
+	})
+
+	t.Run("GeoIP whitelist and blacklist: whitelist has the priority", func(t *testing.T) {
+
+		w := httptest.NewRecorder()
+
+		// BR should be allowed
+		req0 := httptest.NewRequest("GET", testURL, nil)
+		req0.RemoteAddr = googleBRIP
+
+		blackWhiteMw.handlePhase(w, req0, 1, state)
+		assert.False(t, state.Blocked, "Request should be allowed")
+		assert.Equal(t, http.StatusOK, w.Code, "Expected status code 200")
+
+		// US must be blocked
+		req1 := httptest.NewRequest("GET", testURL, nil)
+		req1.RemoteAddr = googleUSIP
+
+		blackWhiteMw.handlePhase(w, req1, 1, state)
 		// Verify that the request was blocked
 		assert.True(t, state.Blocked, "Request should be blocked")
 		assert.Equal(t, http.StatusForbidden, w.Code, "Expected status code 403")
