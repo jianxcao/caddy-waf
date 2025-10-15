@@ -22,6 +22,20 @@ type (
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	logID := uuid.New().String()
 
+	// Add panic recovery to catch and log panics
+	defer func() {
+		if rec := recover(); rec != nil {
+			m.logger.Error("PANIC in ServeHTTP",
+				zap.String("log_id", logID),
+				zap.Any("panic", rec),
+				zap.Stack("stack"),
+			)
+			// Return 500 error to client
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal Server Error"))
+		}
+	}()
+
 	m.logRequestStart(r, logID)
 
 	// Propagate log ID within the request context for logging
@@ -152,7 +166,14 @@ func (m *Middleware) handleResponseBodyPhase(recorder *responseRecorder, r *http
 	}
 	m.logger.Debug("Response body captured for Phase 4 analysis", zap.String("log_id", logID))
 
-	for _, rule := range m.Rules[4] {
+	// Check if rules exist for Phase 4 before iterating
+	rules, ok := m.Rules[4]
+	if !ok || len(rules) == 0 {
+		m.logger.Debug("No rules found for Phase 4")
+		return
+	}
+
+	for _, rule := range rules {
 		if rule.regex.MatchString(body) {
 			if m.processRuleMatch(recorder, r, &rule, body, state) {
 				return

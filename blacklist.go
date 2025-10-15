@@ -65,12 +65,25 @@ func (bl *BlacklistLoader) LoadDNSBlacklistFromFile(path string, dnsBlacklist ma
 }
 
 func (m *Middleware) isIPBlacklisted(ip string) bool {
-	if m.ipBlacklist.Contains(netip.MustParseAddr(ip)) {
-		m.muIPBlacklistMetrics.Lock()                            // Acquire lock before accessing shared counter
-		m.IPBlacklistBlockCount++                                // Increment the counter
-		m.muIPBlacklistMetrics.Unlock()                          // Release lock after accessing counter
-		m.logger.Debug("IP blacklist hit", zap.String("ip", ip)) // Keep existing debug log
-		return true                                              // Indicate that the IP is blacklisted
+	// Extract IP address without port
+	cleanIP := extractIP(ip, m.logger)
+
+	addr, err := netip.ParseAddr(cleanIP)
+	if err != nil {
+		m.logger.Warn("Failed to parse IP address for blacklist check",
+			zap.String("ip", ip),
+			zap.String("clean_ip", cleanIP),
+			zap.Error(err),
+		)
+		return false
+	}
+
+	if m.ipBlacklist.Contains(addr) {
+		m.muIPBlacklistMetrics.Lock()                                 // Acquire lock before accessing shared counter
+		m.IPBlacklistBlockCount++                                     // Increment the counter
+		m.muIPBlacklistMetrics.Unlock()                               // Release lock after accessing counter
+		m.logger.Debug("IP blacklist hit", zap.String("ip", cleanIP)) // Keep existing debug log
+		return true                                                   // Indicate that the IP is blacklisted
 	}
 	return false // Indicate that the IP is NOT blacklisted
 }

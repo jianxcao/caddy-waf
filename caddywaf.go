@@ -82,7 +82,8 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
-	m.ruleCache = NewRuleCache() // Initialize RuleCache
+	m.ruleCache = NewRuleCache()   // Initialize RuleCache
+	m.Rules = make(map[int][]Rule) // Initialize Rules map to prevent nil pointer panic
 
 	// Set default log severity if not provided
 	if m.LogSeverity == "" {
@@ -466,7 +467,16 @@ func (m *Middleware) loadIPBlacklist(path string, blacklistMap iptrie.Trie) erro
 
 	// Convert the map to CIDRTrie
 	for ip := range blacklist {
-		blacklistMap.Insert(netip.MustParsePrefix(ip), nil)
+		// Add /32 suffix if the IP doesn't have CIDR notation
+		if !strings.Contains(ip, "/") {
+			ip = ip + "/32"
+		}
+		prefix, err := netip.ParsePrefix(ip)
+		if err != nil {
+			m.logger.Warn("Skipping invalid IP in blacklist", zap.String("ip", ip), zap.Error(err))
+			continue
+		}
+		blacklistMap.Insert(prefix, nil)
 	}
 	return nil
 }
