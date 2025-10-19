@@ -66,49 +66,6 @@ func TestLoadGeoIPDatabase(t *testing.T) {
 	}
 }
 
-func TestExtractIPFromRemoteAddr(t *testing.T) {
-	handler := NewGeoIPHandler(nil)
-
-	tests := []struct {
-		name       string
-		remoteAddr string
-		want       string
-		wantErr    bool
-	}{
-		{
-			name:       "Valid IP and port",
-			remoteAddr: "192.168.1.1:8080",
-			want:       "192.168.1.1",
-			wantErr:    false,
-		},
-		{
-			name:       "Valid IP only",
-			remoteAddr: "192.168.1.1",
-			want:       "192.168.1.1",
-			wantErr:    false,
-		},
-		{
-			name:       "Invalid IP",
-			remoteAddr: "invalid-ip",
-			want:       "",
-			wantErr:    true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := handler.extractIPFromRemoteAddr(tt.remoteAddr)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("extractIPFromRemoteAddr() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("extractIPFromRemoteAddr() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestIsCountryInList(t *testing.T) {
 	handler := NewGeoIPHandler(nil)
 

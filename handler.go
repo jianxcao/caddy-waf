@@ -305,8 +305,8 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 		// Rate limiting
 		if m.rateLimiter != nil {
 			m.logger.Debug("Starting rate limiting phase")
-			ip := extractIP(r.RemoteAddr, m.logger) // Pass the logger here
-			path := r.URL.Path                      // Get the request path
+			ip := extractIP(r.RemoteAddr) // Pass the logger here
+			path := r.URL.Path            // Get the request path
 			if m.rateLimiter.isRateLimited(ip, path) {
 				m.incrementRateLimiterBlockedRequestsMetric() // Increment the counter in the Middleware
 				m.blockRequest(w, r, state, http.StatusTooManyRequests, "rate_limit", "rate_limit_rule", r.RemoteAddr,
