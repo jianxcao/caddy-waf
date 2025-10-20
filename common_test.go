@@ -4,7 +4,7 @@ import "net/http"
 
 const (
 	geoIPdata  = "GeoLite2-Country.mmdb"
-	localIP    = "127.0.0.1"
+	localIP    = "127.0.0.1:32555"
 	aliCNIP    = "47.88.198.38"
 	googleUSIP = "74.125.131.105"
 	googleBRIP = "128.201.228.12"

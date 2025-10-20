@@ -96,30 +96,6 @@ invalid-ip
 	}
 }
 
-func TestExtractIP(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{"IP with port", "192.168.1.1:8080", "192.168.1.1"},
-		{"IP only", "192.168.1.1", "192.168.1.1"},
-		{"IPv6 with port", "[2001:db8::1]:8080", "2001:db8::1"},
-		{"IPv6 only", "2001:db8::1", "2001:db8::1"},
-	}
-
-	logger := zap.NewNop()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractIP(tt.input, logger)
-			if result != tt.expected {
-				t.Errorf("extractIP(%s) = %s; want %s", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
-
 func TestAddIPEntry(t *testing.T) {
 	logger := zap.NewNop()
 	bl := NewBlacklistLoader(logger)

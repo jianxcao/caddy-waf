@@ -63,11 +63,8 @@ func (gh *GeoIPHandler) IsCountryInList(remoteAddr string, countryList []string,
 		return false, fmt.Errorf("geoip database not loaded")
 	}
 
-	ip, err := gh.extractIPFromRemoteAddr(remoteAddr)
-	if err != nil {
-		gh.logger.Debug("Failed to extract IP from remote address", zap.String("remote_addr", remoteAddr), zap.Error(err))
-		return false, err
-	}
+	// Extract IP address without port
+	ip := extractIP(remoteAddr)
 
 	parsedIP := net.ParseIP(ip)
 	if parsedIP == nil {
@@ -85,10 +82,10 @@ func (gh *GeoIPHandler) GetCountryCode(remoteAddr string, geoIP *maxminddb.Reade
 		return "N/A"
 	}
 
-	ip, err := gh.extractIPFromRemoteAddr(remoteAddr)
+	ip, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		gh.logger.Debug("Failed to extract IP from remote address for GetCountryCode", zap.String("remote_addr", remoteAddr), zap.Error(err))
-		return "N/A"
+		// fallback to input IP
+		ip = remoteAddr
 	}
 
 	parsedIP := net.ParseIP(ip)
@@ -149,20 +146,6 @@ func (gh *GeoIPHandler) getCountryCodeWithCache(ip string, parsedIP net.IP, geoI
 	}
 
 	return record.Country.ISOCode
-}
-
-// extractIPFromRemoteAddr extracts the ip from remote address
-func (gh *GeoIPHandler) extractIPFromRemoteAddr(remoteAddr string) (string, error) {
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		// If it's not in host:port format, assume it's just the IP
-		ip := net.ParseIP(remoteAddr)
-		if ip == nil {
-			return "", fmt.Errorf("invalid IP format: %s", remoteAddr)
-		}
-		return remoteAddr, nil
-	}
-	return host, nil
 }
 
 // Helper function to check if the country in the record is in the country list

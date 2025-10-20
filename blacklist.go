@@ -64,27 +64,21 @@ func (bl *BlacklistLoader) LoadDNSBlacklistFromFile(path string, dnsBlacklist ma
 	return nil
 }
 
-func (m *Middleware) isIPBlacklisted(ip string) bool {
-	// Extract IP address without port
-	cleanIP := extractIP(ip, m.logger)
+func (m *Middleware) isIPBlacklisted(addr string) bool {
+	ip := extractIP(addr)
 
-	addr, err := netip.ParseAddr(cleanIP)
-	if err != nil {
-		m.logger.Warn("Failed to parse IP address for blacklist check",
-			zap.String("ip", ip),
-			zap.String("clean_ip", cleanIP),
-			zap.Error(err),
-		)
-		return false
+	if m.ipBlacklist == nil {
+		m.logger.Error("blacklist", zap.String("IP blacklist", "is nil"))
 	}
 
-	if m.ipBlacklist.Contains(addr) {
-		m.muIPBlacklistMetrics.Lock()                                 // Acquire lock before accessing shared counter
-		m.IPBlacklistBlockCount++                                     // Increment the counter
-		m.muIPBlacklistMetrics.Unlock()                               // Release lock after accessing counter
-		m.logger.Debug("IP blacklist hit", zap.String("ip", cleanIP)) // Keep existing debug log
-		return true                                                   // Indicate that the IP is blacklisted
+	if m.ipBlacklist.Contains(netip.MustParseAddr(ip)) {
+		m.muIPBlacklistMetrics.Lock()                            // Acquire lock before accessing shared counter
+		m.IPBlacklistBlockCount++                                // Increment the counter
+		m.muIPBlacklistMetrics.Unlock()                          // Release lock after accessing counter
+		m.logger.Debug("IP blacklist hit", zap.String("ip", ip)) // Keep existing debug log
+		return true                                              // Indicate that the IP is blacklisted
 	}
+
 	return false // Indicate that the IP is NOT blacklisted
 }
 
@@ -120,22 +114,6 @@ func (m *Middleware) isDNSBlacklisted(host string) bool {
 
 	m.logger.Debug("DNS blacklist miss", zap.String("host", host))
 	return false
-}
-
-// extractIP extracts the IP address from a remote address string.
-func extractIP(remoteAddr string, logger *zap.Logger) string {
-	if logger == nil {
-		logger = zap.NewNop()
-	}
-	host, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		logger.Debug("Using full remote address as IP",
-			zap.String("remoteAddr", remoteAddr),
-			zap.Error(err),
-		)
-		return remoteAddr // Assume the input is already an IP address
-	}
-	return host
 }
 
 // LoadIPBlacklistFromFile loads IP addresses from a file into the provided map.
