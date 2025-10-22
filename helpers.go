@@ -19,6 +19,8 @@ func fileExists(path string) bool {
 }
 
 // isIPv4 - checks if input IP is of type v4
+//
+//nolint:unused
 func isIPv4(addr string) bool {
 	return strings.Count(addr, ":") < 2
 }
