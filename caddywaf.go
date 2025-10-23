@@ -287,17 +287,13 @@ func (m *Middleware) Shutdown(ctx context.Context) error {
 	m.logger.Debug("Logging worker stopped.")
 
 	var firstError error
-	var errorOccurred bool
 
 	// Close GeoIP databases
 	if m.CountryBlacklist.geoIP != nil {
 		m.logger.Debug("Closing country blacklist GeoIP database...")
 		if err := m.CountryBlacklist.geoIP.Close(); err != nil {
 			m.logger.Error("Error encountered while closing country blacklist GeoIP database", zap.Error(err))
-			if !errorOccurred {
-				firstError = fmt.Errorf("error closing country blacklist GeoIP: %w", err)
-				errorOccurred = true
-			}
+			firstError = fmt.Errorf("error closing country blacklist GeoIP: %w", err)
 		} else {
 			m.logger.Debug("Country blacklist GeoIP database closed successfully.")
 		}

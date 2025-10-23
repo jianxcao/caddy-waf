@@ -135,7 +135,7 @@ func (t *TorConfig) readExistingBlacklist() ([]string, error) {
 // writeBlacklist writes the updated IP blacklist to the file.
 func (t *TorConfig) writeBlacklist(ips []string) error {
 	data := strings.Join(ips, "\n")
-	err := os.WriteFile(t.TORIPBlacklistFile, []byte(data), 0o644)
+	err := os.WriteFile(t.TORIPBlacklistFile, []byte(data), 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to write IP blacklist file %s: %w", t.TORIPBlacklistFile, err) // Improved error message with filename
 	}

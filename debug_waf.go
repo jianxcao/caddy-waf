@@ -59,25 +59,31 @@ func (m *Middleware) DumpRulesToFile(path string) error {
 	}
 	defer f.Close()
 
-	f.WriteString("=== WAF Rules Dump ===\n\n")
+	if _, err := f.WriteString("=== WAF Rules Dump ===\n\n"); err != nil {
+		return err
+	}
 
 	for phase := 1; phase <= 4; phase++ {
-		f.WriteString(fmt.Sprintf("== Phase %d Rules ==\n", phase))
+		fmt.Fprintf(f, "== Phase %d Rules ==\n", phase)
 		rules, ok := m.Rules[phase]
 		if !ok || len(rules) == 0 {
-			f.WriteString("  No rules for this phase\n\n")
+			if _, err := f.WriteString("		No rules for this phase\n\n"); err != nil {
+				return err
+			}
 			continue
 		}
 
 		for i, rule := range rules {
-			f.WriteString(fmt.Sprintf("  Rule %d:\n", i+1))
-			f.WriteString(fmt.Sprintf("    ID: %s\n", rule.ID))
-			f.WriteString(fmt.Sprintf("    Pattern: %s\n", rule.Pattern))
-			f.WriteString(fmt.Sprintf("    Targets: %v\n", rule.Targets))
-			f.WriteString(fmt.Sprintf("    Score: %d\n", rule.Score))
-			f.WriteString(fmt.Sprintf("    Action: %s\n", rule.Action))
-			f.WriteString(fmt.Sprintf("    Description: %s\n", rule.Description))
-			f.WriteString("\n")
+			fmt.Fprintf(f, "		Rule %d:\n", i+1)
+			fmt.Fprintf(f, "		ID: %s\n", rule.ID)
+			fmt.Fprintf(f, "		Pattern: %s\n", rule.Pattern)
+			fmt.Fprintf(f, "    Targets: %v\n", rule.Targets)
+			fmt.Fprintf(f, "    Score: %d\n", rule.Score)
+			fmt.Fprintf(f, "    Action: %s\n", rule.Action)
+			fmt.Fprintf(f, "    Description: %s\n", rule.Description)
+			if _, err := f.WriteString("\n"); err != nil {
+				return err
+			}
 		}
 	}
 

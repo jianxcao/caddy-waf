@@ -32,7 +32,14 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next cadd
 			)
 			// Return 500 error to client
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Internal Server Error"))
+			if _, err := w.Write([]byte("Internal Server Error")); err != nil {
+				m.logger.Error(err.Error(),
+					zap.String("log_id", logID),
+					zap.Any("panic", rec),
+					zap.Stack("stack"),
+				)
+				return
+			}
 		}
 	}()
 
@@ -252,7 +259,6 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 	)
 
 	if phase == 1 {
-
 		// IP blacklisting - the highest priority
 		m.logger.Debug("Checking for IP blacklisting", zap.String("remote_addr", r.RemoteAddr)) // Added log for checking before to isIPBlacklisted call
 		xForwardedFor := r.Header.Get("X-Forwarded-For")
@@ -263,7 +269,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 				m.logger.Debug("Checking IP blacklist with X-Forwarded-For", zap.String("remote_addr_xff", firstIP), zap.String("r.RemoteAddr", r.RemoteAddr))
 				if m.isIPBlacklisted(firstIP) {
 					m.logger.Debug("Starting IP blacklist phase")
-					m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule", firstIP,
+					m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule",
 						zap.String("message", "Request blocked by IP blacklist"),
 					)
 					if m.CustomResponses != nil {
@@ -274,12 +280,11 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			} else {
 				m.logger.Debug("X-Forwarded-For header present but empty or invalid")
 			}
-
 		} else {
 			m.logger.Debug("X-Forwarded-For header not present using r.RemoteAddr")
 			if m.isIPBlacklisted(r.RemoteAddr) {
 				m.logger.Debug("Starting IP blacklist phase")
-				m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusForbidden, "ip_blacklist", "ip_blacklist_rule",
 					zap.String("message", "Request blocked by IP blacklist"),
 				)
 				if m.CustomResponses != nil {
@@ -292,7 +297,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 		// DNS blacklisting
 		if m.isDNSBlacklisted(r.Host) {
 			m.logger.Debug("Starting DNS blacklist phase")
-			m.blockRequest(w, r, state, http.StatusForbidden, "dns_blacklist", "dns_blacklist_rule", r.Host,
+			m.blockRequest(w, r, state, http.StatusForbidden, "dns_blacklist", "dns_blacklist_rule",
 				zap.String("message", "Request blocked by DNS blacklist"),
 				zap.String("host", r.Host),
 			)
@@ -309,7 +314,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			path := r.URL.Path            // Get the request path
 			if m.rateLimiter.isRateLimited(ip, path) {
 				m.incrementRateLimiterBlockedRequestsMetric() // Increment the counter in the Middleware
-				m.blockRequest(w, r, state, http.StatusTooManyRequests, "rate_limit", "rate_limit_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusTooManyRequests, "rate_limit", "rate_limit_rule",
 					zap.String("message", "Request blocked by rate limit"),
 				)
 				if m.CustomResponses != nil {
@@ -329,14 +334,14 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 					r,
 					zap.Error(err),
 				)
-				m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule",
 					zap.String("message", "Request blocked due to internal error"),
 				)
 				m.logger.Debug("Country whitelisting phase completed - blocked due to error")
 				m.incrementGeoIPRequestsMetric(false) // Increment with false for error
 				return
 			} else if !allowed {
-				m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule",
 					zap.String("message", "Request blocked by country"))
 				m.incrementGeoIPRequestsMetric(true) // Increment with true for blocked
 				if m.CustomResponses != nil {
@@ -357,15 +362,14 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 					r,
 					zap.Error(err),
 				)
-				m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusForbidden, "internal_error", "country_block_rule",
 					zap.String("message", "Request blocked due to internal error"),
 				)
 				m.logger.Debug("Country blacklisting phase completed - blocked due to error")
 				m.incrementGeoIPRequestsMetric(false) // Increment with false for error
 				return
 			} else if blocked {
-
-				m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule", r.RemoteAddr,
+				m.blockRequest(w, r, state, http.StatusForbidden, "country_block", "country_block_rule",
 					zap.String("message", "Request blocked by country"))
 				m.incrementGeoIPRequestsMetric(true) // Increment with true for blocked
 				if m.CustomResponses != nil {
@@ -388,14 +392,14 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 	m.logger.Debug("Starting rule evaluation for phase", zap.Int("phase", phase), zap.Int("rule_count", len(rules)))
 
 	for _, rule := range rules {
-		m.logger.Debug("Processing rule", zap.String("rule_id", string(rule.ID)), zap.Int("target_count", len(rule.Targets)))
+		m.logger.Debug("Processing rule", zap.String("rule_id", rule.ID), zap.Int("target_count", len(rule.Targets)))
 
 		// Use the custom type as the key
 		ctx := context.WithValue(r.Context(), ContextKeyRule("rule_id"), rule.ID)
 		r = r.WithContext(ctx)
 
 		for _, target := range rule.Targets {
-			m.logger.Debug("Extracting value for target", zap.String("target", target), zap.String("rule_id", string(rule.ID)))
+			m.logger.Debug("Extracting value for target", zap.String("target", target), zap.String("rule_id", rule.ID))
 			var value string
 			var err error
 
@@ -413,21 +417,21 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 			if err != nil {
 				m.logger.Debug("Failed to extract value for target, skipping rule for this target",
 					zap.String("target", target),
-					zap.String("rule_id", string(rule.ID)),
+					zap.String("rule_id", rule.ID),
 					zap.Error(err),
 				)
 				continue
 			}
 
 			m.logger.Debug("Extracted value",
-				zap.String("rule_id", string(rule.ID)),
+				zap.String("rule_id", rule.ID),
 				zap.String("target", target),
 				zap.String("value", value),
 			)
 
 			if rule.regex.MatchString(value) {
 				m.logger.Debug("Rule matched",
-					zap.String("rule_id", string(rule.ID)),
+					zap.String("rule_id", rule.ID),
 					zap.String("target", target),
 					zap.String("value", value),
 				)
@@ -448,7 +452,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 				if !shouldContinue || state.Blocked || state.ResponseWritten {
 					m.logger.Debug("Rule evaluation stopping due to blocking or rule directive",
 						zap.Int("phase", phase),
-						zap.String("rule_id", string(rule.ID)),
+						zap.String("rule_id", rule.ID),
 						zap.Bool("continue", shouldContinue),
 						zap.Bool("blocked", state.Blocked),
 					)
@@ -460,7 +464,7 @@ func (m *Middleware) handlePhase(w http.ResponseWriter, r *http.Request, phase i
 				}
 			} else {
 				m.logger.Debug("Rule did not match",
-					zap.String("rule_id", string(rule.ID)),
+					zap.String("rule_id", rule.ID),
 					zap.String("target", target),
 					zap.String("value", value),
 				)

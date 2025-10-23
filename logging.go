@@ -129,7 +129,7 @@ func (m *Middleware) redactSensitiveFields(fields []zap.Field) []zap.Field {
 // prepareLogFields consolidates the logic for preparing log fields, including common fields and log_id.
 func (m *Middleware) prepareLogFields(r *http.Request, fields []zap.Field) []zap.Field {
 	var logID string
-	var allFields []zap.Field
+	allFields := make([]zap.Field, 0)
 
 	// Initialize with common fields
 	var sourceIP, userAgent, requestMethod, requestPath, queryParams string

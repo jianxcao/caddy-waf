@@ -18,7 +18,7 @@ func (m *Middleware) allowRequest(state *WAFState) {
 }
 
 // blockRequest handles blocking a request and logging the details.
-func (m *Middleware) blockRequest(recorder http.ResponseWriter, r *http.Request, state *WAFState, statusCode int, reason, ruleID, matchedValue string, fields ...zap.Field) {
+func (m *Middleware) blockRequest(recorder http.ResponseWriter, r *http.Request, state *WAFState, statusCode int, reason, ruleID string, fields ...zap.Field) {
 	// CRITICAL FIX: Set these flags before any other operations
 	state.Blocked = true
 	state.StatusCode = statusCode

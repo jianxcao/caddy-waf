@@ -18,7 +18,7 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 	logID := r.Context().Value(ContextKeyLogId("logID")).(string)
 
 	m.logRequest(zapcore.DebugLevel, "Rule Matched", r, // More concise log message
-		zap.String("rule_id", string(rule.ID)),
+		zap.String("rule_id", rule.ID),
 		zap.String("target", strings.Join(rule.Targets, ",")),
 		zap.String("value", value),
 		zap.String("description", rule.Description),
@@ -37,7 +37,7 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 	state.TotalScore += rule.Score
 	m.logRequest(zapcore.DebugLevel, "Anomaly score increased", r, // Corrected argument order - 'r' is now the third argument
 		zap.String("log_id", logID),
-		zap.String("rule_id", string(rule.ID)),
+		zap.String("rule_id", rule.ID),
 		zap.Int("score_increase", rule.Score),
 		zap.Int("old_score", oldScore),
 		zap.Int("new_score", state.TotalScore),
@@ -51,7 +51,7 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 
 	// Debug the actual action field value to verify what's being used
 	m.logger.Debug("Rule action/mode check",
-		zap.String("rule_id", string(rule.ID)),
+		zap.String("rule_id", rule.ID),
 		zap.String("action_field", rule.Action),
 		zap.Int("score", rule.Score),
 		zap.Int("threshold", m.AnomalyThreshold),
@@ -77,7 +77,7 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 		state.StatusCode = http.StatusForbidden
 
 		// Block the request and write the response immediately
-		m.blockRequest(w, r, state, http.StatusForbidden, blockReason, string(rule.ID), value,
+		m.blockRequest(w, r, state, http.StatusForbidden, blockReason, rule.ID,
 			zap.Int("total_score", state.TotalScore),
 			zap.Int("anomaly_threshold", m.AnomalyThreshold),
 			zap.String("final_block_reason", blockReason),
@@ -92,14 +92,14 @@ func (m *Middleware) processRuleMatch(w http.ResponseWriter, r *http.Request, ru
 	if rule.Action == "log" {
 		m.logRequest(zapcore.InfoLevel, "Rule action: Log", r,
 			zap.String("log_id", logID),
-			zap.String("rule_id", string(rule.ID)),
+			zap.String("rule_id", rule.ID),
 			zap.Int("total_score", state.TotalScore),         // ADDED: Log total score for log action
 			zap.Int("anomaly_threshold", m.AnomalyThreshold), // ADDED: Log anomaly threshold for log action
 		)
 	} else if !shouldBlock && !state.ResponseWritten {
 		m.logRequest(zapcore.DebugLevel, "Rule action: No Block", r,
 			zap.String("log_id", logID),
-			zap.String("rule_id", string(rule.ID)),
+			zap.String("rule_id", rule.ID),
 			zap.String("action", rule.Action),
 			zap.Int("total_score", state.TotalScore),
 			zap.Int("anomaly_threshold", m.AnomalyThreshold),
@@ -240,11 +240,11 @@ func (m *Middleware) loadRulesFromFile(path string, ruleIDs map[string]bool) (va
 			continue
 		}
 
-		if _, exists := ruleIDs[string(rule.ID)]; exists {
+		if _, exists := ruleIDs[rule.ID]; exists {
 			fileInvalidRules = append(fileInvalidRules, fmt.Sprintf("Duplicate rule ID '%s' at index %d", rule.ID, i))
 			continue
 		}
-		ruleIDs[string(rule.ID)] = true // Track rule IDs to prevent duplicates
+		ruleIDs[rule.ID] = true // Track rule IDs to prevent duplicates
 
 		// RuleCache handling (compile and cache regex)
 		if cachedRegex, exists := m.ruleCache.Get(rule.ID); exists {

@@ -37,7 +37,7 @@ func TestBlockRequest(t *testing.T) {
 		r := httptest.NewRequest(http.MethodGet, "/test", nil)
 		state := &WAFState{}
 
-		m.blockRequest(w, r, state, http.StatusForbidden, "test reason", "rule1", "match1")
+		m.blockRequest(w, r, state, http.StatusForbidden, "test reason", "rule1")
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.Equal(t, "Blocked", w.Body.String())
@@ -56,7 +56,7 @@ func TestBlockRequest(t *testing.T) {
 		r = r.WithContext(ctx)
 		state := &WAFState{}
 
-		m.blockRequest(w, r, state, http.StatusForbidden, "test reason", "rule1", "match1")
+		m.blockRequest(w, r, state, http.StatusForbidden, "test reason", "rule1")
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
 		assert.True(t, state.Blocked)
@@ -75,7 +75,7 @@ func TestBlockRequest(t *testing.T) {
 		}
 		recorder := NewResponseRecorder(w)
 
-		m.blockRequest(recorder, r, state, http.StatusForbidden, "test reason", "rule1", "match1")
+		m.blockRequest(recorder, r, state, http.StatusForbidden, "test reason", "rule1")
 
 		assert.Equal(t, http.StatusForbidden, recorder.StatusCode()) // Check the Recorder status code instead
 		assert.True(t, state.ResponseWritten)                        // Check that the ResponseWritten flag is set
