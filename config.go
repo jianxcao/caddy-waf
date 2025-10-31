@@ -136,16 +136,6 @@ func (cl *ConfigLoader) UnmarshalCaddyfile(d *caddyfile.Dispenser, m *Middleware
 
 	cl.logger.Debug("Parsing WAF configuration", zap.String("file", d.File()), zap.Int("line", d.Line()))
 
-	// Set default values
-	m.LogSeverity = "info"
-	m.LogJSON = false
-	m.AnomalyThreshold = 5
-	m.CountryBlacklist.Enabled = false
-	m.CountryWhitelist.Enabled = false
-	m.LogFilePath = "debug.json"
-	m.RedactSensitiveData = false
-	m.LogBuffer = 1000
-
 	directiveHandlers := map[string]func(d *caddyfile.Dispenser, m *Middleware) error{
 		"metrics_endpoint":      cl.parseMetricsEndpoint,
 		"log_path":              cl.parseLogPath,

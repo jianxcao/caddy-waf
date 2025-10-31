@@ -67,8 +67,24 @@ func (*Middleware) CaddyModule() caddy.ModuleInfo {
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
 	logger := zap.L().Named("caddyfile_parser")
 	logger.Info("Starting to parse Caddyfile", zap.String("file", h.Dispenser.File()))
-
-	var m Middleware
+	m := Middleware{
+		LogSeverity:         "debug",
+		LogJSON:             false,
+		AnomalyThreshold:    5,
+		LogFilePath:         "debug.json",
+		RedactSensitiveData: false,
+		LogBuffer:           1000,
+		CountryBlacklist: CountryAccessFilter{
+			Enabled:     false,
+			CountryList: []string{},
+			GeoIPDBPath: "",
+		},
+		CountryWhitelist: CountryAccessFilter{
+			Enabled:     false,
+			CountryList: []string{},
+			GeoIPDBPath: "",
+		},
+	}
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	if err != nil {
 		return nil, fmt.Errorf("caddyfile parse error: %w", err)
