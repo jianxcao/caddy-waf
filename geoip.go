@@ -150,6 +150,7 @@ func (gh *GeoIPHandler) getCountryCodeWithCache(ip string, parsedIP net.IP, geoI
 
 // Helper function to check if the country in the record is in the country list
 func (gh *GeoIPHandler) isCountryInRecord(record GeoIPRecord, countryList []string) bool {
+	fmt.Println("isCountryInRecord", record.Country.ISOCode, countryList)
 	for _, country := range countryList {
 		if strings.EqualFold(record.Country.ISOCode, country) {
 			return true
